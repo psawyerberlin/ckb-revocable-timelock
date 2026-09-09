@@ -623,7 +623,7 @@ This is a deliberate scope decision, not an oversight. It is defensible because 
 
 **Required disclaimer, displayed in the web interface at the point of choosing a deadline** — not buried in terms of service — whenever the term exceeds five years:
 
-> TimeMachine Network uses secp256k1 elliptic-curve cryptography, the same cryptography that secures Bitcoin and Nervos CKB. It is not quantum-resistant. A sufficiently capable quantum computer could recover keys protected by it. No such machine is known to exist, and expert estimates for when one might vary widely.
+> CKB Revocable Timelock uses secp256k1 elliptic-curve cryptography, the same cryptography that secures Bitcoin and Nervos CKB. It is not quantum-resistant. A sufficiently capable quantum computer could recover keys protected by it. No such machine is known to exist, and expert estimates for when one might vary widely.
 >
 > For deadlines within a few years this is not a practical concern. For deadlines a decade or more away, you are accepting a risk that cannot currently be quantified. If your data must stay confidential that long, renew and rewrap periodically so it can be migrated to stronger cryptography when it becomes available.
 
