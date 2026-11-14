@@ -4,6 +4,36 @@ Newest spec first. One `##` section per spec, one bullet per decision: what was 
 what was chosen and why. Protocol-changing decisions are also proposed as a `SPEC.md` diff in the PR body
 (`AIWORKER.md` §5).
 
+## Spec 01 — `crt-contracts` (`aiworker/01-crt-contracts.md`)
+
+### Phase 1 — housekeeping, toolchain, workspace
+
+- 2026-11-15 — Housekeeping verified, nothing to repair: no `*:Zone.Identifier` files, no `crt-spec-repo.tar.gz`,
+  no `node/`, `docs/history/{concept-v0.3,node-api-v0.1-draft,spec-v0.1-draft}.md` present, `.gitignore` already
+  lists `target/`, `build/`, `node_modules/`, `.refs/`, `.devnet/`, `dist/`. `CHANGELOG.md` already had an
+  "Unreleased" section; one line for the workspace was added.
+- Toolchain: Rust stable (rustup, minimal profile) and `riscv64imac-unknown-none-elf` were already installed in
+  the user's home; `rust-toolchain.toml` at the repository root pins `stable` with that target and the `rustfmt`
+  and `clippy` components (the quality gates of `AIWORKER.md` need them). Root rather than `contracts/` so the
+  later `service/` workspace shares the pin.
+- Workspace `ckb-std` pin is CSR's (`=1.1.0`, `allocator`, `dummy-atomic`) **without** `ckb-types`: phase 3
+  forbids it for the lock (the `bytes` crate emits atomics ckb-vm rejects) and no other member uses ckb-std.
+- `default-members = ["crt-core", "crt-contract-tests"]`: `crt-node-lock` is `no_std`/`no_main` and cannot be
+  built for the host (ckb-std's `entry!` only provides `_start`/panic handler for riscv64), so a plain
+  `cargo test` / `cargo clippy --all-targets` in `contracts/` would fail. The lock is built by
+  `scripts/build-contracts.sh` (`-p crt-node-lock --target riscv64imac-unknown-none-elf`) and linted with the
+  same `--target`. `named.mjs` uses `-p`, unaffected.
+- Member crates are created now as compiling stubs so that the workspace resolves and the gates run: `crt-core`
+  is an empty `#![no_std]` library (phase 2 adds `k256`/`blake2b-ref`), `crt-contract-tests` an empty library
+  (phase 4 adds `ckb-testtool` and `build.rs`), and `crt-node-lock` **fails closed** with exit code 127 (not a
+  §4.3 code) so a stub build can never be mistaken for a working lock. Phase 3 replaces it.
+- `scripts/build-contracts.sh` is CSR's script with one package and a `data_hash` step: blake2b-256 with
+  personalization `ckb-default-hash`, computed with Python's `hashlib` (`python3 -I`), which is on the machine
+  and avoids a Rust helper binary; if `python3` is missing the script says so instead of failing. `-C link-arg=-s`
+  plus `strip = true` in the release profile as in CSR.
+- `contracts/Cargo.lock` is committed (CSR does the same) so `--locked` builds are reproducible; the data hash of
+  the stub build is **not** recorded as the code hash (phase 3 records the real one).
+
 ## (no spec run yet)
 
 - 2026-11-14 — maintainer: SPEC.md v0.2 (CSR edition) and the specs under `aiworker/` written; vectors in
