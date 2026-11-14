@@ -6,6 +6,32 @@ what was chosen and why. Protocol-changing decisions are also proposed as a `SPE
 
 ## Spec 01 — `crt-contracts` (`aiworker/01-crt-contracts.md`)
 
+### Phase 3 — `crt-node-lock`
+
+- 2026-11-15 — Release build (`scripts/build-contracts.sh`, stripped): **52 584 bytes**, data hash
+  `0x8e389ff2fa0c933ba27fa45585f3a4db542c095ef8eb45d784f37252d26ff751` (well under the 120 KB estimate).
+  Any later source or dependency change changes this; phase 5 records the final one in `docs/contracts.md`.
+- **Every input of the group is checked on the owner path** (SPEC §4: "every input of the group is checked"),
+  not only index 0 as the phase note suggests. Reason: anyone can create a cell with lock `crt-node-lock`,
+  args `T ‖ R` and arbitrary data; with "index 0 only" an attacker could put such a cell (with their own
+  `owner_lock_hash`) at group index 0 next to a real Node Cell and spend both through the owner path. So the
+  owner path succeeds only if every group input's `owner_lock_hash` is present among the inputs; each group
+  input's data must decode (error 6) before the owner path is evaluated.
+- Node path with more than one group input fails with **12** ("require the same count of outputs": the node path
+  allows exactly one output, so only a one-input group can match). Error 15 (no runner input) is checked first.
+- Rule order inside release follows the SPEC §4.2 table: pubkey unchanged and derived from `privkey` (21), then
+  `since` form (8) and value (22), then the Alive Cell dep (23). `node_release_changes_pubkey_rejected` therefore
+  yields **21** (pubkey is not in the 11 field list). `deadline + GRACE` overflow → 22 (unreachable deadline).
+- Commit check is literal: `in.pubkey` all zero, `out.pubkey[0] ∈ {02, 03}` and not all zero, `out.privkey` all
+  zero → else 20. No on-curve check (the spec does not describe one; an invalid point only makes the switch
+  unreleasable, which a malicious runner can achieve anyway by forgetting its key).
+- Molecule `Script` parsing is strict (header offsets 16/48/49, total size, args length consistent). Own script
+  that does not fit 256 bytes or does not parse → 5. Cell deps without a type script (`ItemMissing`) or with a
+  type script larger than 128 bytes (cannot have 32-byte args) are skipped for the dep rule.
+- Output data / capacity: output data invalid → 6, then capacity (13), then unchanged fields (11) — SPEC order.
+  Syscall errors map as in CSR's dual lock: 1 index out of bound, 2 item missing, 3 length not enough, 4 other
+  (also used for unexpected field lengths).
+
 ### Phase 2 — `crt-core`
 
 - 2026-11-15 — `k256` 0.13 with only `arithmetic` (no ecdsa needed: only scalar → point); `blake2b-ref` 0.3 for
