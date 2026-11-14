@@ -7,3 +7,4 @@ description = "ckb-testtool harness and transaction tests for crt-node-lock (pha
 
 [dependencies]
 crt-core = { path = "../crt-core" }
+ckb-testtool = "1.1.1"

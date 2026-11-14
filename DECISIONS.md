@@ -6,6 +6,26 @@ what was chosen and why. Protocol-changing decisions are also proposed as a `SPE
 
 ## Spec 01 — `crt-contracts` (`aiworker/01-crt-contracts.md`)
 
+### Phase 4 — `crt-contract-tests`
+
+- 2026-11-15 — `ckb-testtool` 1.1.1 (CSR's version). Harness in `src/lib.rs`, the 24 named tests in
+  `tests/node_lock.rs`. `build.rs` runs `scripts/build-contracts.sh` into `contracts/build/cargo-target` only
+  when `contracts/build/release/crt-node-lock` is missing, as CSR does.
+- Measured: the release transaction (Node Cell + runner wallet input, Alive Cell dep) takes **2 298 371 cycles**
+  with the phase 3 binary (data hash `0x8e389ff2…26ff751`, unchanged); budget 60 M, verifier limit 70 M.
+- Owner and runner wallet are always-success locks (`hash_type data1`) told apart by their args; the lock is
+  referenced with `hash_type data2`. The Alive Cell dep has type `{TYPE_ID_CODE_HASH, type, T}`, an
+  always-success lock and data `CRT\x01`; ckb-testtool does not run type scripts of deps, so no type-id binary.
+- `node_release_changes_pubkey_rejected` expects **21**: the output carries another self-consistent key pair,
+  and the pubkey is not among the error-11 fields (phase 3 rule order).
+- Error assertions match `"error code {n} "` in the verifier's error (CSR's helper). Only the node lock can fail
+  in these transactions (all other scripts are always-success), so the script is not matched by name.
+- Some tests cover several cases in a loop: `bad_args_length_rejected` (0, 32, 63, 65 bytes),
+  `bad_data_length_rejected` (0, 138, 140 bytes, with the owner's input present, so this also checks that
+  undecodable data fails before the owner path), `node_state2_to_anything_rejected` (2 → 0, 1, 2).
+- The test since values are not checked against headers (ckb-testtool runs only scripts); the lock reads
+  `since` itself, which is what these tests are about.
+
 ### Phase 3 — `crt-node-lock`
 
 - 2026-11-15 — Release build (`scripts/build-contracts.sh`, stripped): **52 584 bytes**, data hash
