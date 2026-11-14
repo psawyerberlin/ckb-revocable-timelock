@@ -1,7 +1,7 @@
 # Spec 01 — `crt-core` and `crt-node-lock` (`crt-contracts`)
 
 **Branch:** `aiworker/crt-contracts`. **Acceptance:** `acceptance/aiworker-crt-contracts/`.
-**Normative:** `SPEC.md` §2, §3.1–3.2, §4, §13. **Model to copy:** `../ckb-service-runner/contracts/` (workspace
+**Normative:** `SPEC.md` §2, §3.1–3.2, §4, §13. **Model to copy:** `.refs/csr/contracts/` (workspace
 layout, `build-contracts.sh`, `csr-contract-tests` with `ckb-testtool`, hand-parsed data, `k256` 0.13 no_std).
 
 ## Phase 1 — repository housekeeping and workspace

@@ -1,5 +1,11 @@
 # Working on this repository as an AI worker
 
+> **Note (2026-11-15).** The work is run by **AIWorker** on `pswsl` (see `aiworker/README.md`). The ready-to-upload specs
+> are in `aiworker/specs/`; they point back to this file and to `aiworker/0N-*.md` for the details. Where this file
+> talks about branches, commits, pull requests, a spec 00 or a `../` checkout, the rules in each spec's "How this
+> project runs" section win. CSR spec 00 (`random_bytes`) shipped in CSR 0.6.1 and is no longer part of this plan.
+
+
 This file is the contract between the maintainer and an autonomous coding agent ("the worker"). It follows the
 convention used in `ckb-service-runner` (branches `aiworker/<name>`, protected `acceptance/aiworker-<name>/`
 directories, `DECISIONS.md`). Read it fully before touching anything.
@@ -11,7 +17,7 @@ in order; a phase is done only when its acceptance tests pass (§4).
 
 | Spec | Repository it runs in | Produces |
 |---|---|---|
-| `aiworker/00-csr-random-bytes.md` | `ckb-service-runner` (checkout at `../ckb-service-runner`) | host call 7050 |
+| `aiworker/00-csr-random-bytes.md` | `ckb-service-runner` (checkout at `.refs/csr`) | host call 7050 |
 | `aiworker/01-crt-contracts.md` | this one | `contracts/crt-core`, `contracts/crt-node-lock` |
 | `aiworker/02-crt-service.md` | this one | `service/crt-service`, `scripts/crt-enable.sh` |
 | `aiworker/03-crt-client.md` | this one | `client/` (TypeScript library) |
@@ -29,7 +35,7 @@ decision (§5). The worker never waits for a human.
   the acceptance scripts (`~/.cargo/bin`; symlink into `~/.local/bin` if the judge's PATH lacks it, as noted in
   CSR `docs/decisions.md`, csr-service-catalog Phase 1).
 * Node.js ≥ 22 (`node --test`), npm. No global npm packages.
-* A checkout of `ckb-service-runner` at `../ckb-service-runner` (tag ≥ 0.6.0, plus the result of spec 00 when a
+* A checkout of `ckb-service-runner` at `.refs/csr` (tag ≥ 0.6.0, plus the result of spec 00 when a
   later spec needs it). Its `sdk/js/csr-job.mjs`, `scripts/devnet.sh`, `csr-dev` and `spec/*.md` are used
   read-only; this repository never vendors CSR code except the single file `client/vendor/csr-job.mjs` (copied,
   with its tag in a comment).

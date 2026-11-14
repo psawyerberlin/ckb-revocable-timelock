@@ -50,7 +50,7 @@ wallet; make any post-quantum claim. Applications (see `docs/developers.md`, and
 | Node registry, stake, slashing cells | CSR registry cell (`RegistryV3`), Nervos DAO stake, monitor attestation. No CRT cells. |
 | Node HTTP API (`/v1/switch`, `/v1/release`) | None. Keygen and release are written on chain by the service's transaction skeleton. |
 | Node daemon (`CRT-node`) | The CRT **service**: a RISC-V program run by `csr run` against `spec/host-interface.md`. |
-| Per-condition key from a CSPRNG | `random_bytes` host call (7050), **to be implemented in CSR** (`aiworker/00-csr-random-bytes.md`). |
+| Per-condition key from a CSPRNG | `random_bytes` host call (7050), shipped in CSR 0.6.1. |
 | Key deletion on cancel | `delete_on_consume(key, alive_cell_outpoint)` — host-enforced, works while the service is disabled. |
 | Job Cell (fee escrow), quarterly PoP claims | CSR job cells: tips per heartbeat run are the retainer; the on-chain run transaction is the liveness proof. |
 | Registry pool, organiser fee | Dropped (pool) / optional output (organiser fee, §11). |
@@ -615,11 +615,10 @@ Shared conformance vectors live in `spec/vectors/` and are checked by the Rust a
 
 ## 14. CSR requirements
 
-CRT v0.1 needs exactly one change in CSR, specified in `aiworker/00-csr-random-bytes.md` for the
-`ckb-service-runner` repository:
+CRT v0.1 needed exactly one change in CSR, shipped in CSR 0.6.1 (`spec/host-interface.md` there):
 
 * **`random_bytes(addr, len)` (7050)**: fill `len ≤ 1024` bytes from the host's CSPRNG; local mode too. Return 0,
-  or 11 when `len > 1024`.
+  11 when `len > 1024`, or 12 when `len = 0`.
 
 Already present and relied on: `kv_*` with `kv_mark_secret` and `delete_on_consume`; `cells_query` (prefix match,
 ≤ 64 cells); `chain_read`; `block_info` median time; `tx_skeleton_put` with skeleton `since` and cell deps;

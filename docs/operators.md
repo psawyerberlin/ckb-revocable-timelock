@@ -32,7 +32,7 @@ owner's own runner is often one of the switch's mandatory nodes; running one for
 
 ## Enable
 
-Requires CSR ≥ the release that ships `random_bytes` (spec 00; `csr version`). One script:
+Requires CSR ≥ 0.6.1 (`random_bytes`; check with `csr version`). One script:
 
 ```sh
 curl -fLO https://raw.githubusercontent.com/psawyerberlin/ckb-revocable-timelock/main/scripts/crt-enable.sh

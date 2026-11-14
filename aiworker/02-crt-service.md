@@ -1,8 +1,8 @@
 # Spec 02 — the CRT service for CSR (`crt-service`)
 
 **Branch:** `aiworker/crt-service`. **Acceptance:** `acceptance/aiworker-crt-service/`.
-**Depends on:** spec 00 merged in `../ckb-service-runner` (for `random_bytes`), spec 01 (`crt-core`).
-**Normative:** `SPEC.md` §5, §6, §14. **Model to copy:** `../ckb-service-runner/services/rust/*` (workspace,
+**Depends on:** CSR ≥ 0.6.1 (`random_bytes`), spec 01 (`crt-core`).
+**Normative:** `SPEC.md` §5, §6, §14. **Model to copy:** `.refs/csr/services/rust/*` (workspace,
 `csr-svc` syscall wrappers, manifests), `spec/host-interface.md`.
 
 ## Phase 1 — host bindings

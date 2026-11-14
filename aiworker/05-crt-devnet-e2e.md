@@ -1,7 +1,7 @@
 # Spec 05 — devnet end-to-end, cycle budgets, testnet deployment (`crt-devnet-e2e`)
 
 **Branch:** `aiworker/crt-devnet-e2e`. **Acceptance:** `acceptance/aiworker-crt-devnet-e2e/`.
-**Depends on:** specs 00–04 merged; a CSR build from `../ckb-service-runner` including spec 00.
+**Depends on:** specs 01–04; CSR ≥ 0.6.1.
 
 ## Phase 1 — one-command devnet
 
