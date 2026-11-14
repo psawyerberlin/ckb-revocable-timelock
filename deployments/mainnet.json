@@ -1,0 +1,2 @@
+{ "network_id": 0, "enabled": false,
+  "note": "CRT runs on testnet until CSR's service runtime opens on mainnet (CSR README, Phase 2 gate)." }

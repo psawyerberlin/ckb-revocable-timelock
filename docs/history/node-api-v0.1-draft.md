@@ -1,3 +1,5 @@
+> **Historical.** Superseded by [SPEC.md v0.2 (CSR edition)](../../SPEC.md). Kept for the record; section numbers here are not the stable ones.
+
 # `node/` — the node contract
 
 **No code here yet.** This file is the interface a CRT node must implement. It is written so that a node and a coordinator can be built independently, by different people, in different languages, and still interoperate. Read [`../SPEC.md`](../SPEC.md) first.

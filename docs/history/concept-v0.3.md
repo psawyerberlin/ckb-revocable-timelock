@@ -1,3 +1,5 @@
+> **Historical.** Superseded by [SPEC.md v0.2 (CSR edition)](../../SPEC.md). Kept for the record; section numbers here are not the stable ones.
+
 # CKB Revocable Timelock (CRT)
 
 ## A Decentralised Conditional-Release Key Service on Nervos CKB

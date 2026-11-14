@@ -1,0 +1,172 @@
+{
+ "description": "Shamir over GF(2^8), reduction polynomial 0x11b, byte-wise; share = x (1 byte, 1..n) || y (32 bytes). combine(any t shares) == secret; the listed subsets are share indices (0-based) that must work. share_commitment = blake2b256(\"CRT/v1/share\" || share). SPEC.md section 7.1.",
+ "vectors": [
+  {
+   "t": 2,
+   "n": 3,
+   "secret": "0x207bf742fe0ce079dc4e0dd7c2cb8a707ae94c6cbc62caf6953f5eb65aead648",
+   "shares": [
+    "0x01050baa7b44574b3e3cde579b024cc10326f600b448bb7c3ed895ea0f33132a07",
+    "0x026a9b4d3091baadf70775b94f59de1c96c2d7d4c74fcbbd7d0f702ddf880335d6",
+    "0x034feb10092be106b0e7e5e303995957e59ec8981fbb120bb542da9966e1fac999"
+   ],
+   "share_commitments": [
+    "0x757dfd3054475ef2db3385d795948cfa2bad66050551fa3f4b9006a16bb12698",
+    "0x01e81cc78d6109eb5b92e2a403837f3ff4c73dda3c235ee4e71c8126f828ffa5",
+    "0x9511166414b7be5c7baaa7c7b1a9804a84fc8d4c8be16ece59a1a2204f1dd6c9"
+   ],
+   "combine_subsets": [
+    [
+     0,
+     1
+    ],
+    [
+     2,
+     1
+    ]
+   ]
+  },
+  {
+   "t": 3,
+   "n": 5,
+   "secret": "0xa4fc3feb7ce0bd8268fde8640ec4a661ddd94f83b3be580638cf5ae0dd3b3f78",
+   "shares": [
+    "0x010ec33b286ecd686c3d61251f6d347949515088802f45af03d047502e90386160",
+    "0x024a6d20a87c0d70e469a649f79bc7b29ea9c12b4245583f3098a2590d1d9e8663",
+    "0x03e052246b6e20a50a3c3a848cf8376db62548ec41d9a3c835702a53c3509dd87b",
+    "0x04d1545d38eccbd7fcf0b031d6680f7c0ef2ad6e2b3d45e89ad496009235d042e2",
+    "0x057b6b59fbfee60212a52cfcad0bffa3267e24a928a1be1f9f3c1e0a5c78d31cfa"
+   ],
+   "share_commitments": [
+    "0x74a8b24445091bacf489d87bec2a796d1cacc3e8d2686c41017ebd3184212fe8",
+    "0x9f9dd6a1b7b9cd014b7572d25c38fdc2dfcd9ef76bb95c032aa0672471ba9e71",
+    "0xd1f884d05292c934b5d977f86ee362abdc26c08a22fc48bdfdd267251ad2e8db",
+    "0x50a1ee4c8e4812bb1d49c1d20c33f50fa58d7cf046f3781f06b93908076ce17a",
+    "0xf9d58e3e4bacc3f4e415180584ac8574d6d61a46564f470a10ec4b3b42c115d1"
+   ],
+   "combine_subsets": [
+    [
+     0,
+     1,
+     2
+    ],
+    [
+     4,
+     3,
+     2
+    ]
+   ]
+  },
+  {
+   "t": 5,
+   "n": 8,
+   "secret": "0xcfc8bf519bf7efc956ebd8d434586851e0c0031725e475ef24ad65b80d7232f6",
+   "shares": [
+    "0x013d1b98547fe898a0133c4f1a5b6a792e8d8ecc338f8de1e5f09c2002712e1f78",
+    "0x024fdabccda7b80d57ef676f523bcf0fed18bbd2c14c8473087c16f33d2e47fe41",
+    "0x03d4303dc88fdaa9b072ff00d82263952dbab4b973fc0396de1750e0c89655e299",
+    "0x0451772c64f0b4bda44fbc995bc5b6094da885b0cfe68b67a935544aa3cb46eeb3",
+    "0x05ce32f2618abe16c4ecd2281685ed0f9d51568ab210b0ce5d4e4ce0a019a565d2",
+    "0x06b4b668f8f63e9d266c7eafcb57bd5a7e72c036c55fdac4f4e27a5a689235b182",
+    "0x0742ca10fd4049e5c8175fe6c26178d7114452a82eb30f1cdc2615a62484980bb5",
+    "0x0824e598a25674a48ccd113fe1179c1272f5cfea6be9c719fee45520643edf4bc9"
+   ],
+   "share_commitments": [
+    "0xd853955dcf111e80db05b6f31b41fc3616c26ef39111bd4dfd58e374b005601e",
+    "0xc39ec52b652f25a10c7b264ae0d23f929725b8cdf3dc9d0ff62ee93fe065be02",
+    "0xb4b4775cc185c47727ea8fb10d89ca789d5392ab98504b3e6b38af47416805b9",
+    "0xf236cba2d34499d91e95670556f1a6501789c53703274af089453c4a7055b3bf",
+    "0x55bd6493893548b54653007f887d3e108631a657b672e5acb43334de6a27f4ab",
+    "0x20be1bcfd243ee6845b07401166a0adf63a3f6e1bb7ebd02dcd7a82161ca9787",
+    "0x7b44907766c5cf929b144eade57b883e1a9dac89a0c783b16900d7bc02ae1dd4",
+    "0x26bcd1be29ee71431636e5f3fbec5e2be914137d27797ff8136b5bc4ad615403"
+   ],
+   "combine_subsets": [
+    [
+     0,
+     1,
+     2,
+     3,
+     4
+    ],
+    [
+     7,
+     6,
+     5,
+     4,
+     3
+    ]
+   ]
+  },
+  {
+   "t": 1,
+   "n": 1,
+   "secret": "0x83c85c84b872c03cc45284ce55f438b0330708572688cd644b6cfd979c893cf8",
+   "shares": [
+    "0x0183c85c84b872c03cc45284ce55f438b0330708572688cd644b6cfd979c893cf8"
+   ],
+   "share_commitments": [
+    "0xd2046198c1ec969f077f8b011841ad35ba261bdd2aa13ee2a98d9a30d5046ed5"
+   ],
+   "combine_subsets": [
+    [
+     0
+    ],
+    [
+     0
+    ]
+   ]
+  },
+  {
+   "t": 6,
+   "n": 12,
+   "secret": "0x37799dc6634435771f42d4b221e0b3b5bd1a6fec342d9554930f47b476082d9f",
+   "shares": [
+    "0x01bb73af2998287652b7081c75d654c129ff32173e368089d522a5608eddc64219",
+    "0x0248912834955d0206348054b30c330efaecf978581b9720017f714619fd6509ba",
+    "0x03f1ed5c418b2e360853754d7c3292823e10649843574d690dc29ef9f79af17a3b",
+    "0x04830ea58840035c6f80f1b8411449cd2919f4267272c69e01cd2c50f8037a2fd4",
+    "0x05ddf70b243b454888228c4196b14c1dac3efe8eaca26f0e2ac4eb9dc9adf2e060",
+    "0x0697d830a21432022dae97334094b7fa2f4cb1dcd7c1b367197a87c83e9fe82089",
+    "0x07fc57d8948a6b61e1c3551b9ff8a7d4f2d50eecc05f6da2bf7f059ddbfd3af33a",
+    "0x08487e4de1afd873238850dd88be9342254ed926ff1492e3cd4e306f56449d5efa",
+    "0x09379a372e126aed521d64f3592340a396ba071a0f0054aee7e1f31d48b8f23ede",
+    "0x0a79cc6eefbc9e70b9fbe158e5552673c2ef12151d516b6ad1fe8268495b4f84b8",
+    "0x0b335e52bae43399e3a16aa73c01e06c29a579b1240bda72765d0482836b7af89b",
+    "0x0cd745c201e381cd3ab3a397a39e4221cd01c9be89c0eebb25dfe926d25e5b1784"
+   ],
+   "share_commitments": [
+    "0x789cefb713519cdfd1f9e86c04a0ac8a702cdee9e397407fae6cb2ba98e4bd05",
+    "0x14f541cb46a3d7735f21ef400df611e2633f0539148b8adadd8490bbce4fa8d2",
+    "0xa2cdc8e142dd6efcf6b6eeb4bd094e26f6a1c182fc5a8f322170d5d95ac68416",
+    "0x66bfc299843a130b4eb4feaac7afdc9d65fe61e12f219ee11b17a5d75590f0ca",
+    "0xd6b048a3a1e40b8e390fcfda65f2068d88eb441cf8bff1630177d75b0603a5a3",
+    "0xc8a91aac57b6c20763e7e995c72200a0627e77d12776e573c1512f44d6542436",
+    "0x854a62bc4301fda8a0c0bc8d59a042635a5eb02de56f3bf14445e8a90820ee5e",
+    "0x06435102005d0d9382e0ef15d88a08800f2622868161828fadd0955040de02f0",
+    "0xb48227180fa0929433a7d03f57177895cce826f5f42c259194527bd94fe7372f",
+    "0x3509e1d518c8f94c8943f255c715245d55a73de7b9481fbb5156b8ab68ecdb7f",
+    "0x2c88b4c95f046eddce33cdcd17472fef79780f05b8575cbd3f1c813db191a238",
+    "0xe11455ea4bdde54343e54bc456bf090ce3ddc109e76b64e95c514a0db5264dcf"
+   ],
+   "combine_subsets": [
+    [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5
+    ],
+    [
+     11,
+     10,
+     9,
+     8,
+     7,
+     6
+    ]
+   ]
+  }
+ ]
+}

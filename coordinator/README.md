@@ -1,6 +1,6 @@
 # `coordinator/` — the coordinator contract
 
-**No code here yet.** This file defines what a CRT coordinator may do, what it must never do, and the API it exposes. Read [`../SPEC.md`](../SPEC.md) first.
+**v0.2 item, optional.** In SPEC.md v0.2 (CSR edition) the coordinator is bypassable and not needed for v0.1: the reference client works against a bare CKB RPC and the CSR monitor API. The API below is the v0.1-draft proposal (keyed by `I`); it will be revised against SPEC.md v0.2 before any code is written. This file defines what a CRT coordinator may do, what it must never do, and the API it exposes. Read [`../SPEC.md`](../SPEC.md) first.
 
 Paired document: [`../node/README.md`](../node/README.md).
 

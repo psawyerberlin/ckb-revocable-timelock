@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Build on CRT — CKB Revocable Timelock</title>
+<meta name="description" content="Integrate a cancellable timelock into your application with the CRT client library: keys now, keys later, one recovery file.">
+<link rel="stylesheet" href="/assets/site.css">
+<link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="/">CRT <span>CKB Revocable Timelock</span></a>
+  <nav>
+    <a href="/">Overview</a>
+    <a href="/how-it-works.html">How it works</a>
+    <a href="/operators.html">Run a node</a>
+    <a href="/developers.html" aria-current="page">Build on it</a>
+    <a href="/faq.html">Questions</a>
+    <a href="https://github.com/psawyerberlin/ckb-revocable-timelock">Source</a>
+  </nav>
+</header>
+
+<main class="page">
+  <aside class="rail">
+    <ol>
+      <li><a href="#contract">The contract</a></li>
+      <li><a href="#flow">The flow in code</a></li>
+      <li><a href="#kit">Extending the recovery file</a></li>
+      <li><a href="#show">What to tell your users</a></li>
+      <li><a href="#pieces">The pieces</a></li>
+    </ol>
+    <div class="status">Library: <code>@crt/client</code>, TypeScript, browser and Node. Wallets through <a href="https://github.com/ckb-devrel/ccc">CCC</a>.</div>
+  </aside>
+
+  <article>
+    <h1>Build on CRT</h1>
+    <p class="lede">CRT gives your application public keys to encrypt to and, later, the private keys — released on chain when the deadline passes without a cancel. What you encrypt, where you keep it and who gets it is yours. The reference application is <a href="https://github.com/psawyerberlin/dead-man-switch">dead-man-switch</a>.</p>
+
+    <h2 id="contract">The contract</h2>
+    <ol class="steps">
+      <li><div><b>Plaintext never leaves the browser.</b> You generate a content key <code>K</code> and encrypt locally.</div></li>
+      <li><div><b>CRT splits <code>K</code> for you.</b> <code>splitKey</code> with an access tree, <code>wrapKey</code> to the runners’ public keys; you get back sealed envelopes to store next to your ciphertext. CRT never sees <code>K</code>.</div></li>
+      <li><div><b>The recovery file is yours to extend.</b> <code>generateKit</code> produces one self-contained HTML file; your payload rides inside it and your hook runs once <code>K</code> is recovered.</div></li>
+      <li><div><b>Cancel is one transaction</b> (<code>buildCancel</code>), with no fee. Make it as visible as create.</div></li>
+    </ol>
+
+    <h2 id="flow">The flow in code</h2>
+<pre>import { loadDeployment, listRunners, selectRunners, buildCreate, readSwitch,
+         verifyNodes, buildDescriptor, buildArm, wrapKey, generateKit, buildCancel } from '@crt/client';
+
+const dep = await loadDeployment('testnet');
+const plan = selectRunners(await listRunners(dep), { n: 8 });      // staked, attested, diverse
+const deadline = Math.floor(Date.now() / 1000) + 180 * 86400;
+
+const { tx, T } = await buildCreate({ signer, deployment: dep, deadline, runners: plan,
+                                      heartbeatBlocks: 8000n, termBlocks: 180n * 8000n });
+await signer.sendTransaction(tx);                                   // one transaction
+
+let sw; do { sw = await readSwitch(dep, T); }                       // wait for 8 commits
+while (sw.nodeCells.filter(c => c.state === 1).length < 8);
+await verifyNodes(dep, T, plan);                                    // hard fail, no override
+
+const descriptor = await buildDescriptor(dep, T, plan,
+  { kind: 'threshold', t: 5, n: 8, leaves: plan.map((_, i) => ({ node: i })) });
+await signer.sendTransaction(await buildArm({ signer, deployment: dep, T,
+  descriptorHash: descriptor.descriptor_hash }));
+
+const K = crypto.getRandomValues(new Uint8Array(32));
+const ciphertext = await yourEncrypt(K, plaintext);                  // your format
+const envelopes = await wrapKey(K, descriptor);
+download('kit.html', generateKit({ descriptor, envelopes,
+  application: { name: 'your-app', version: '1', payload: { ciphertext } } }));
+
+// later, if the user changes their mind:
+await signer.sendTransaction(await buildCancel({ signer, deployment: dep, T }));</pre>
+    <p><code>verifyNodes</code> checks every Node Cell against the deployment and the CSR registry and throws on any mismatch. There is no flag, option or environment variable that skips it; a test in the repository makes sure none appears.</p>
+
+    <h2 id="kit">Extending the recovery file</h2>
+    <p>The kit exposes <code>window.CRT_KIT.application</code> with your payload and calls <code>window.crtApplication.onKey(K)</code> after recovery. Your script is appended to the file; it must be as self-contained as the kit itself — no network, no CDN — so that it still opens in 2040. The file is byte-for-byte reproducible from the descriptor, the envelopes and your payload.</p>
+
+    <h2 id="show">What to tell your users</h2>
+    <ul>
+      <li>The duration risk and the two margins (threshold and mandatory), separately.</li>
+      <li>That a runner dishonest from day one is not defended against — hence thresholds and diversity.</li>
+      <li>The cost split: tips are spent, cells come back.</li>
+      <li>That released keys are public on chain: after the deadline, whoever has the recovery file can decrypt. The file is the secret-bearing artefact of <em>your</em> application; CRT’s data is all public.</li>
+    </ul>
+
+    <h2 id="pieces">The pieces</h2>
+    <dl class="kv">
+      <dt><code>contracts/</code></dt><dd><code>crt-core</code>, a shared <code>no_std</code> library, and <code>crt-node-lock</code>, the one CKB script.</dd>
+      <dt><code>service/</code></dt><dd>The program CSR runs; the state machine of a run fits on one screen.</dd>
+      <dt><code>client/</code></dt><dd>Access trees, envelopes, descriptor, kit, transaction builders, recovery, a CLI.</dd>
+      <dt><code>scripts/devnet-e2e.sh</code></dt><dd>A devnet with three runners and the full scenario, in one command.</dd>
+    </dl>
+    <p class="small">Developer guide: <a href="https://github.com/psawyerberlin/ckb-revocable-timelock/blob/main/docs/developers.md">docs/developers.md</a>. Protocol: <a href="https://github.com/psawyerberlin/ckb-revocable-timelock/blob/main/SPEC.md">SPEC.md</a>.</p>
+  </article>
+</main>
+
+<footer>
+  <span>CRT — an open protocol on Nervos CKB. MIT.</span>
+  <a href="https://github.com/psawyerberlin/ckb-revocable-timelock/blob/main/SPEC.md">Specification</a>
+  <a href="https://github.com/ckb-service-runner/ckb-service-runner">CKB Service Runner</a>
+  <a href="https://csr-monitor.chainsolution.net">CSR network monitor</a>
+  <a href="https://dead-man-switch.chainsolution.net">dead-man-switch</a>
+</footer>
+</body>
+</html>

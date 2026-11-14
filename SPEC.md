@@ -1,403 +1,615 @@
-# CRT — Revocable Timelock on Nervos CKB
+# CKB Revocable Timelock (CRT) — Specification
 
-**Specification `v0.1-draft`.** Nothing here is implemented. Section numbers are stable; if you argue with a section, cite its number.
+**Version 0.2 (CSR edition). Status: normative for the v0.1 implementation. Supersedes SPEC v0.1-draft and the
+concept note v0.3 (both kept under `docs/history/`).**
 
-Earlier drafts of this design circulated as *TimeMachine Network (TMN)*. Domain-separation strings still carry the `TMN/v1` prefix; renaming them is [open question O-7](#13-open-questions) and must be settled before any string is frozen into a script.
+CRT is timelock encryption with a working cancel button. It hands out a public key now and a private key later,
+and nothing else. This version of the specification builds CRT **on CSR (CKB Service Runner)**: a CRT node is a
+CSR runner that has enabled the CRT service. CRT ships no node daemon, no node registry, no stake contract and no
+node HTTP API of its own; CSR provides all four. What CRT adds is one lock script, one CKB-VM service, a client
+library and two file formats.
 
----
-
-## 1. The primitive
-
-CRT provides exactly one operation and its inverse.
-
-- **Create.** A user obtains a *recipient descriptor* now. The descriptor contains everything needed to derive a public key. Anyone can encrypt to it immediately.
-- **Release.** Once a condition anchored on CKB is satisfied, nodes publish their private key parts. Anyone who can reach a threshold of them can reconstruct the decryption key. Release is public: after it happens, the data is decryptable by anybody who holds the ciphertext.
-- **Cancel.** The owner consumes the on-chain cell. The condition becomes permanently unsatisfiable, nodes delete their key parts, and the data is unrecoverable forever.
-
-That is the whole product surface. Everything below is how to make those three operations safe.
-
-### 1.1 In scope
-
-Descriptors; per-condition key custody; watching conditions; deleting keys; publishing release values; node registry and reputation; fee escrow.
-
-### 1.2 Out of scope
-
-Encrypting user data. Storing user data. Transporting user data. CRT hands out a public key and, later, a private key. What you wrap with it and where you keep the ciphertext is the application's problem. This is deliberate — see [§12](#12-relation-to-drand-and-to-sarcophagus).
-
-Post-quantum security is also out of scope; see [§10](#10-quantum-posture).
+Section numbers are stable from this version on (CONTRIBUTING.md). Changes against v0.1-draft are listed in §16.
 
 ---
 
-## 2. Terminology
+## 1. Overview
 
-| Term | Meaning |
+| Operation | What happens on chain | What happens in the nodes |
+|---|---|---|
+| **Create** | The owner's wallet creates one **Alive Cell** (type-id `T`), one **Node Cell** per chosen runner and one CSR **job cell** per chosen runner, in one transaction. | Each runner's CRT service runs its job, generates a fresh secp256k1 key pair from the host CSPRNG, stores the private key in its encrypted service storage with a *delete-on-consume* rule bound to the Alive Cell, and writes the public key into its Node Cell. |
+| **Arm** | The owner's wallet writes the `descriptor_hash` into every Node Cell. | Nothing. |
+| **Hold** | Each runner's heartbeat job runs every `HEARTBEAT` blocks and is paid a tip per run. | The service checks the predicate; nothing is published. |
+| **Release** | When `median_time ≥ deadline + GRACE` **and** the Alive Cell is still live, each runner's heartbeat run spends its Node Cell and recreates it with the **private key in the cell data**. The lock script verifies the private key against the public key and the `since` of the input. | The service deletes the private key after the release transaction is committed. |
+| **Cancel** | The owner consumes the Alive Cell with no replacement. The predicate becomes permanently unsatisfiable (type-id `T` can never exist again). | CSR deletes every stored private key bound to that out point, even when the service is disabled (`delete_on_consume`). |
+
+Three parties, as before:
+
+1. **Owner wallet** — any CKB lock (JoyID, secp256k1, multisig, …). Owns the Alive Cell and the Node Cells; signs
+   and sends every transaction that touches the switch (create, arm, renew, rewrap, cancel, reclaim).
+2. **Runners** — CSR runners (`ckb-service-runner`): registered on chain with a Nervos DAO stake, ranked by the
+   CSR Network Monitor, running the CRT service inside the CSR sandbox. They never sign anything for the switch
+   except their own CSR run transactions.
+3. **Coordinator** (optional, v0.2) — a web service that helps choose runners, mirrors descriptors and builds
+   *unsigned* transactions. Fully bypassable: the reference client works against a bare CKB RPC.
+
+Everything a client needs is public chain state. The release values are **in the chain forever** (cell data of a
+committed transaction), so recovery needs no server and survives every runner going offline afterwards.
+
+### 1.1 What CRT does not do
+
+Encrypt, store or transport user data; manage recipients; send email; defend against a threshold-sized coalition
+of runners; defend against a runner dishonest from the first day (deletion is unverifiable); replace a lost owner
+wallet; make any post-quantum claim. Applications (see `docs/developers.md`, and the reference application
+`dead-man-switch`) do the first two.
+
+### 1.2 Relation to CSR
+
+| CRT concept (v0.1-draft) | On CSR |
 |---|---|
-| **Switch** | One condition plus the set of node keys bound to it |
-| **Alive Cell** | The CKB live cell whose existence encodes "not yet released, not cancelled" |
-| **Job Cell** | The escrow cell funding node fees for one switch |
-| **`T`** | 32-byte `type-id` of the Alive Cell |
-| **`I`** | Condition identity, derived from `T` — the name nodes index by |
-| **Per-condition keypair** | A fresh secp256k1 keypair a node generates for exactly one switch |
-| **Release value** | The per-condition **private key**, published at release |
-| **Descriptor** | Signed JSON describing a switch: `T`, `I`, access tree, node pubkeys, commitments |
-| **Recovery kit** | Self-contained offline HTML file given to the user; certificate plus recovery tool |
-| **Access tree** | The structure (thresholds, mandatory branches) combining node keys into one secret |
-| **Coordinator** | A web interface plus API that organises switches. Convenience only |
-| **Node** | An independent operator holding one key part per switch, for a fee |
-| **`K`** | The reconstructed secret the access tree yields at release |
+| Node registry, stake, slashing cells | CSR registry cell (`RegistryV3`), Nervos DAO stake, monitor attestation. No CRT cells. |
+| Node HTTP API (`/v1/switch`, `/v1/release`) | None. Keygen and release are written on chain by the service's transaction skeleton. |
+| Node daemon (`CRT-node`) | The CRT **service**: a RISC-V program run by `csr run` against `spec/host-interface.md`. |
+| Per-condition key from a CSPRNG | `random_bytes` host call (7050), **to be implemented in CSR** (`aiworker/00-csr-random-bytes.md`). |
+| Key deletion on cancel | `delete_on_consume(key, alive_cell_outpoint)` — host-enforced, works while the service is disabled. |
+| Job Cell (fee escrow), quarterly PoP claims | CSR job cells: tips per heartbeat run are the retainer; the on-chain run transaction is the liveness proof. |
+| Registry pool, organiser fee | Dropped (pool) / optional output (organiser fee, §11). |
+| Fraud proofs, slashing | Out of scope for v0.1 (CSR defines no slashing). Premature release is prevented by consensus (`since`); off-chain leaks are unpreventable in any design. |
 
 ---
 
-## 3. Threat model and trust assumptions
+## 2. Constants and identifiers
 
-### 3.1 What CRT defends against
+| Name | Value | Notes |
+|---|---|---|
+| `PREFIX` | `CRT/v1` | Resolves O-7. The `TMN/v1` prefix of v0.1-draft is abandoned. |
+| `GRACE` | 86 400 s (24 h) | Resolves O-8. Protocol constant, in the lock script. |
+| `HEARTBEAT` | 8 000 blocks (≈ 1 day) | Default `Every(k)` interval of the heartbeat job. User-selectable per switch; the lock does not care. |
+| `network_id` | `0` mainnet, `1` testnet, `2` devnet | Same byte as `RegistryV3.network`. |
+| blake2b-256 | CKB default: 32-byte digest, personalization `ckb-default-hash` | Everywhere. |
+| Type ID script | `code_hash 0x00000000000000000000000000000000000000000000000000545950455f4944`, `hash_type type` | CKB's system type-id script. |
 
-- **A minority of dishonest nodes.** Below the threshold, colluding nodes learn nothing usable.
-- **A malicious coordinator.** The coordinator never holds key material, never signs a user transaction, and cannot cancel a switch. Substituting its own node public keys is caught by signature verification against the on-chain registry ([§8.4](#84-client-hard-fail)).
-- **Later compromise of an honest node.** Because keys are per-condition and deleted at resolution, seizing a node's disk after a switch resolves yields nothing about that switch.
-- **Premature release.** The predicate is evaluated against chain time only ([§4.3](#43-predicate)), so releasing early is objectively provable by anyone, not a matter of one node's word against another's.
-
-### 3.2 What CRT does not defend against
-
-- **A coalition at or above the threshold.** This is the stated design limit: there is intended to be no loophole *other than* a threshold-sized coalition of rogue nodes.
-- **A node dishonest from the start.** Key deletion is unverifiable. A node that copies its key at generation time keeps it forever, and no protocol here detects that. Per-condition keys protect against *later* compromise of an honest node — nothing more. Say this to users plainly.
-- **Node closure.** If a node vanishes without publishing, its share is gone. Above the threshold this is survivable; a lost mandatory node is fatal. See [§9](#9-duration-and-risk-posture).
-- **The owner losing their wallet.** The Alive Cell is locked by the user. No wallet, no renewal, no cancel.
-
-### 3.3 Parties
-
-Three, and only three:
-
-1. **User wallet** — JoyID or any CKB wallet. Signs and broadcasts every transaction that touches the user's switch.
-2. **Nodes** — register themselves on-chain with stake, submit their own claim transactions, pay their own fees.
-3. **Coordinator** — scans the chain and serves an API. **Never initiates a blockchain transaction.** It may build unsigned transactions for the wallet to sign.
-
----
-
-## 4. Conditions
-
-### 4.1 Alive Cell
-
-A CKB live cell with:
-
-- a standard **`type-id`** type script carrying a 32-byte id `T`;
-- a **lock script chosen by the user** — any lock, including custom ones. Nodes never execute it and never care what it is;
-- cell data containing at least `deadline` (chain time) and `descriptor_hash`.
-
-The cell being locked by the user is what makes coordinator hostage-taking impossible.
-
-### 4.2 Identity
-
-```
-I = blake2b256( "TMN/v1/cell" || network_id || T )
+```text
+T  = args of the Alive Cell's type-id script (32 bytes)        — globally unique, unrecreatable once consumed
+I  = blake2b256( "CRT/v1/cell" ‖ network_id ‖ T )              — switch identity, 32 bytes
+R  = runner lock hash of a CSR runner (RegistryV3 dual-lock args[32..64], or the whole 32-byte args)
 ```
 
-`deadline` is deliberately **excluded** from `I`. Renewal changes the deadline; if the deadline were in the identity, every renewal would invalidate every descriptor already handed out.
-
-### 4.3 Predicate
-
-A node considers the condition satisfied for `I` when, at a block `B` with roughly 30 confirmations:
-
-1. a live cell with `type-id` equal to `T` exists on `network_id`; **and**
-2. `deadline + GRACE <= median_time(B)`.
-
-Node wall clocks are never consulted. `median_time` is the only clock in the protocol. `GRACE` is a protocol constant, not a per-switch parameter.
-
-### 4.4 Cancellation
-
-Cancellation is consuming the Alive Cell **without replacement**. `type-id` uniqueness means `T` can never be recreated, so condition (1) of the predicate is permanently false. Nodes observing the consumption delete their per-condition keys and may claim the completion portion of their fee ([§11.2](#112-claim-schedule)).
-
-Cancellation costs the user no organiser fee. Charging to cancel would be an incentive to leave switches armed.
-
-### 4.5 Custom scripts
-
-Custom **lock** scripts on the Alive Cell are supported and free.
-
-User-supplied **predicate** scripts are rejected. Nodes must all reach the same verdict from the same chain state; a per-switch predicate is a way for nodes to legitimately disagree, and disagreement breaks threshold recovery.
+`I` excludes the deadline, so renewals never change descriptors or ciphertexts. `I` is the key under which a
+runner's service stores the private key, and the AAD of every envelope (§7). Test vectors: `spec/vectors/identity.json`.
 
 ---
 
-## 5. Key model
+## 3. On-chain objects
 
-### 5.1 Per-condition keypairs
+Exactly three kinds of cell belong to a switch. Capacities are approximate (lock scripts of 53–97 bytes).
 
-On accepting a switch, each node generates a **fresh secp256k1 keypair from a CSPRNG**, bound to exactly one `I`.
+### 3.1 Alive Cell
 
-Deriving that key from a node master secret via HKDF is forbidden. A derived key cannot be deleted — the master secret regenerates it — so deletion would be theatre and cancellation would be a lie.
+* **Type:** type-id, `args = T`.
+* **Lock:** the owner's lock. Nodes never evaluate it. Any lock works (multisig, executor key, DAO, time lock).
+* **Data:** 4 bytes `43 52 54 01` (`"CRT"` ‖ version 1). **Immutable** — the Alive Cell is never updated, only
+  created once and consumed once. Its out point is therefore stable for the life of the switch, which is what
+  `delete_on_consume` needs (§6.4). The deadline is **not** here (change from v0.1-draft, §16).
+* **Capacity:** ≈ 61–130 CKB, refunded on cancel.
 
-### 5.2 No DKG, no federation
+**Cancellation** = a transaction with the Alive Cell as input and **no output whose type script is the type-id
+script with args `T`**. Nothing else is cancellation.
 
-Each node's key is independent. There is no distributed key generation and no group share. Two reasons, both fatal to the alternative:
+### 3.2 Node Cell (one per runner)
 
-- one successful collusion against a long-lived group share silently compromises **every ciphertext ever produced** against it, retroactively;
-- a group share cannot be deleted, so cancellation is impossible by construction.
+* **Lock:** `crt-node-lock` (§4), `hash_type data2`, `args = T (32) ‖ R (32)`.
+* **Type:** none.
+* **Data:** fixed layout, 139 bytes:
 
-### 5.3 Release is disclosure, not signing
+```text
+NodeCellData {
+  version:          u8        // 1
+  state:            u8        // 0 created, 1 armed (pubkey set), 2 released (privkey set)
+  deadline:         u64 LE    // unix seconds; compared to the chain's median time through `since`
+  owner_lock_hash:  [u8;32]   // who may take the owner path (§4.1)
+  descriptor_hash:  [u8;32]   // zero until the arm transaction
+  pubkey:           [u8;33]   // compressed secp256k1; zero in state 0
+  privkey:          [u8;32]   // zero before state 2
+}
+```
 
-The release value is the per-condition **private key**, published verbatim. It is not a signature over anything.
+* **Capacity:** 8 + 97 + 139 = **244 CKB**, refundable by the owner (owner path) at any time — including after
+  release: the release value stays in chain history even when the cell is later destroyed.
 
-This choice dropped BLS and IBE from the design entirely. Consequences:
+The Node Cell is at the same time the **key commitment** (state 1), the **release record** (state 2) and the
+only per-switch state the node reads (deadline). All `n` Node Cells of a switch carry the same `deadline`,
+`owner_lock_hash` and `descriptor_hash`; the owner updates them together.
 
-- secp256k1 throughout, natively verifiable inside CKB scripts;
-- no domain-confusion attack in which a node is induced to sign the release value before the deadline, because there is no release signature to induce.
+### 3.3 CSR job cells (one keygen job and one heartbeat job per runner)
 
-### 5.4 Deletion
+Standard CSR job cells (`ckb-service-runner/spec/job-cell-standard.md`), built with `sdk/js/csr-job.mjs`:
 
-Deletion is unverifiable and the spec says so in [§3.2](#32-what-crt-does-not-defend-against). The nearest thing to a control is the quarterly proof of possession ([§11.3](#113-proof-of-possession)), which detects a node that has *stopped* holding a key — the opposite failure — early enough to rewrap.
+| | Keygen job | Heartbeat job |
+|---|---|---|
+| `csr-job-type.args` | service ID of **this runner's** CRT service (§5.1) | same |
+| `trigger` | `OnDemand` | `Every(HEARTBEAT)` |
+| `remaining_runs` | 1 | `ceil(term_blocks / HEARTBEAT)` |
+| `payload` | `"CRTS" ‖ 0x01 ‖ T` (37 bytes) | same |
+| `tip_shannons` | `KEYGEN_TIP` (default 1 CKB) | `HEARTBEAT_TIP` (default 0.5 CKB) |
+| `max_fee_shannons` | default 0.002 CKB | same |
+| `max_cycles` | measured on devnet, default 100 M | same |
+| `expiry_block` | creation + ≈ 7 days | end of term + ≈ 7 days |
+| `refund_lock_hash` | owner lock hash | owner lock hash |
 
----
+The service does not distinguish the two jobs: every run executes the same state machine (§6) against chain
+state. The keygen job only exists so that keygen happens within minutes rather than after the first
+`HEARTBEAT` interval. Both jobs refund their unspent capacity to the owner when consumed.
 
-## 6. Access trees
-
-### 6.1 Composition
-
-- **Shamir secret sharing** provides thresholds (`k`-of-`n`).
-- **XOR** provides conjunction (AND).
-
-A mandatory node is an XOR branch composed with a Shamir branch. "5-of-8 with one mandatory" therefore means: `M` **XOR** (4-of-7 over the remaining nodes).
-
-### 6.2 Mandatory branches
-
-A mandatory branch should itself be `j`-of-`m` — 2-of-3, say — never 1-of-1 on a multi-year term. A 1-of-1 mandatory branch is a single point of failure with a business behind it.
-
-**Standing trade-off, to be quoted at users at the point of choice:** every mandatory node makes the secret harder to steal and easier to lose, one for one.
-
-### 6.3 Nodes are blind to the tree
-
-A node never learns the threshold, the identities of the other nodes, or whether it is mandatory. It receives a request for `I`, generates a key, returns a signed public key.
-
-Two consequences:
-
-- a coalition cannot shop for the mandatory node, because no node can tell it which one that is;
-- new tree structures ship without touching node code. The tree lives in the descriptor and in the client.
-
----
-
-## 7. Descriptor and recovery kit
-
-### 7.1 Recipient descriptor
-
-Signed JSON, roughly 2–6 KB. Entirely public and entirely non-secret. Contents:
-
-- `network_id`, `T`, `I`
-- the access tree
-- one **signed per-condition public key per node**
-- share commitments
-- coordinator URL used at creation (informational)
-
-### 7.2 The descriptor body is not on-chain
-
-Only `descriptor_hash` goes into the Alive Cell, as an integrity anchor.
-
-Publishing the body on-chain would hand any future coalition a targeting map naming every node serving the switch — including, by elimination over time, the mandatory one.
-
-### 7.3 Recovery kit
-
-The user downloads a **single self-contained HTML file** that acts as certificate, archive and offline recovery tool at once. It contains:
-
-- the descriptor, `T`, `network_id`, creation and deadline timestamps
-- the node list and a rendered diagram of the access tree
-- instructions written for an heir who has never heard of CKB
-- embedded zero-dependency recovery JavaScript
-
-Hard requirements: it must open from a USB stick with no network, and it must print legibly on paper.
-
-### 7.4 Coordinator mirror
-
-The coordinator keeps a copy in its database, retrievable by wallet login. This copy is **non-authoritative** and verifiable against the on-chain `descriptor_hash`.
-
-### 7.5 Key envelope is not CRT's
-
-The wrapped blobs an application produces at encryption time — the key envelope — belong to the application and live beside its ciphertext. CRT never sees them.
+Why one job per runner: CSR assigns no runner to a job — any registered runner may run any job of a service it
+has approved. CRT needs *specific* runners, so each runner enables the CRT program with **its own `R` as service
+args**; the service ID (`spec/service-manifest.md` §4) then differs per runner, and a job names exactly one
+runner. Inside the sandbox the service reads `R` from its own script args (`load_script`) and the lock script
+enforces it (§4.2), so no CSR change is needed for assignment.
 
 ---
 
-## 8. Architecture
+## 4. The `crt-node-lock` script
 
-### 8.1 Coordinator
+Rust, `ckb-std`, `hash_type = data2`. Args: `T (32) ‖ R (32)`, else error 5. The script runs as a lock group;
+every input of the group is checked. Rule order determines the error code.
 
-A web interface plus API. Scans the chain, maintains the node directory, assembles descriptors, aggregates release values, publishes headroom.
+### 4.1 Owner path
 
-**Hard rule: the coordinator never initiates a blockchain transaction.** It scans, and it builds unsigned transactions. The user's wallet signs and broadcasts.
+If any input of the transaction has `lock_hash == owner_lock_hash` of this cell's data: **everything is
+allowed** (update deadline, write `descriptor_hash`, destroy, recreate). The owner's own signature is the
+authorisation; the owner can only hurt the owner.
 
-### 8.2 Nodes
+### 4.2 Node path
 
-Register on-chain with stake. Submit their own registration and claim transactions and pay their own network fees. Serve an HTTP API ([`node/README.md`](node/README.md)).
+Otherwise, an input with `lock_hash == R` (the runner wallet cell of a CSR run transaction) must exist (error
+15), and exactly one output must have the same lock script as this input (error 12). Let `in` be this input's
+data and `out` the output's data, both valid `NodeCellData` (error 6). `out.capacity ≥ in.capacity` (error 13).
+`version`, `deadline`, `owner_lock_hash`, `descriptor_hash` unchanged (error 11). Then by state:
 
-### 8.3 Release distribution
+| `in.state` → `out.state` | Conditions |
+|---|---|
+| 0 → 1 (**commit**) | `in.pubkey` all zero; `out.pubkey` 33 bytes with prefix `02` or `03`, not all zero; `out.privkey` all zero (error 20). |
+| 1 → 2 (**release**) | `out.pubkey == in.pubkey`; `secp256k1_pubkey(out.privkey) == in.pubkey` (error 21); the input's `since` has the absolute-timestamp form (flags `0x40`) and `since_seconds ≥ in.deadline + GRACE` (error 22, wrong form error 8); a **cell dep** exists whose type script is the type-id script with `args == T` — the live Alive Cell (error 23). |
+| anything else | error 24. |
 
-Nodes publish release values to **their own endpoints and by gossip**. The coordinator aggregates as a convenience and can be bypassed entirely. A recovery kit that can only reach the node endpoints must still work.
+The `since` check is what makes a premature release impossible to commit: consensus refuses the transaction
+until the median time of the last 37 blocks has passed `deadline + GRACE`. The cell-dep check is what makes
+release impossible after cancel: a dead cell cannot be a dep. The lock does not check that the dep's lock or
+data mean anything — the type-id script already guarantees that only one cell with `args = T` can ever exist.
 
-### 8.4 Client hard-fail
+### 4.3 Error codes
 
-The client **must** verify each per-condition public key's signature against the node's key in the on-chain registry, and **must** abort if any verification fails.
+| code | meaning |
+|-----:|---------|
+| 1–4 | syscall failure |
+| 5 | args not 64 bytes |
+| 6 | data not a valid `NodeCellData` (length 139, version 1, state ≤ 2) |
+| 8 | release: `since` not absolute-timestamp form |
+| 11 | node path changed `version`, `deadline`, `owner_lock_hash` or `descriptor_hash` |
+| 12 | node path: not exactly one output with this lock script |
+| 13 | node path: output capacity below input capacity |
+| 15 | node path: no input with lock hash `R` |
+| 20 | commit: pubkey rules violated |
+| 21 | release: `privkey` does not derive `pubkey` |
+| 22 | release: `since` below `deadline + GRACE` |
+| 23 | release: no live Alive Cell dep (type-id, args `T`) |
+| 24 | node path: state transition not allowed |
 
-This is non-optional. There is no skip flag, no "continue anyway" button, no configuration key that disables it. Without it, a malicious coordinator substitutes its own keys for the node keys and holds the entire secret.
+### 4.4 What the lock does not do
 
-### 8.5 Standalone operation
-
-`crt-client` must work against a bare CKB RPC endpoint with no coordinator at all: build the transaction, talk to nodes directly, assemble the descriptor locally. See [§11.5](#115-the-organiser-fee-is-bypassable).
+Check `R` against the CSR registry (CSR's own job lock does that for the run transaction); check the heartbeat;
+pay anything; verify the descriptor. It is ~300 lines and shares its parsing and EC code with the service
+through the `crt-core` crate.
 
 ---
 
-## 9. Duration and risk posture
+## 5. The CRT service (runs inside CSR)
 
-The expected case is a deadline **under one year**. Multi-year is rare and the client must price the risk accordingly.
+### 5.1 Identity and installation
+
+The CRT service is one RISC-V binary (`crt-service`, Rust, `ckb-std`, target `riscv64imac-unknown-none-elf`,
+built like CSR's `services/rust/*`). Its data hash is `CRT_CODE_HASH`, published once per network as an on-chain
+**service manifest** with empty args (so it appears in every runner's catalog with name, description and links;
+nothing posts jobs to that generic ID).
+
+A runner enables CRT with a **local manifest** whose `args` is its own `R`:
+
+```toml
+name = "crt"
+language = "rust"
+elf = "crt-service.elf"       # the released binary, data hash CRT_CODE_HASH
+args = "0x<R, 32 bytes>"
+```
+
+`scripts/crt-enable.sh` (operators, `docs/operators.md`) reads `R` from the runner, writes this file, runs
+`csr service add-local --manifest … && csr service approve … && csr service enable …` and prints the runner's
+**CRT service ID** = `blake2b256("CSR-SERVICE-v1" ‖ CRT_CODE_HASH ‖ u32 LE 32 ‖ R ‖ 0x00)`. Clients compute the
+same from the registry cell; nothing has to be published by the operator.
+
+### 5.2 Inputs of a run
+
+* `load_script().args` → `R` (32 bytes; any other length → result `bad_args`, exit 0, empty skeleton).
+* `job_payload` → must be `"CRTS" ‖ 0x01 ‖ T` (37 bytes), else result `bad_payload`.
+* `block_info` → `median_time_ms`.
+* `cells_query(type-id script with args T, type)` → the Alive Cell out point, or none.
+* `cells_query(crt-node-lock with args T ‖ R, lock)` → this runner's Node Cell out point, or none.
+* `chain_read(0 / 1, out point)` → the Node Cell output and data.
+* `kv_get(I)` → the stored private key, if any.
+
+`I = blake2b256("CRT/v1/cell" ‖ network_id ‖ T)`; `network_id` comes from the data cell (§5.5).
+
+### 5.3 State machine
+
+```text
+no Alive Cell                         → CANCELLED:  kv_delete(I); empty skeleton; result "cancelled"
+no Node Cell for (T, R)               → DROPPED:    kv_delete(I); empty skeleton; result "dropped"
+Node state 0, kv_get(I) missing       → KEYGEN:     d ← random_bytes(32) until 0 < d < n;  P ← d·G
+                                                    kv_put(I, d); kv_mark_secret(I);
+                                                    delete_on_consume(I, alive_cell_outpoint);
+                                                    skeleton: Node Cell → state 1, pubkey P
+Node state 0, kv_get(I) present       → RECOMMIT:   P ← d·G from the stored d (a previous commit tx failed);
+                                                    same skeleton as KEYGEN (never generate a second key)
+Node state 1, kv_get(I) missing       → LOST:       empty skeleton; result "key_lost"   (operator alarm)
+Node state 1, median_time_ms/1000 < deadline + GRACE
+                                      → HOLD:       empty skeleton; result "hold"
+Node state 1, median_time_ms/1000 ≥ deadline + GRACE
+                                      → RELEASE:    skeleton: Node Cell → state 2, privkey d,
+                                                    input since = 0x40 ‖ (deadline + GRACE) seconds,
+                                                    cell dep = Alive Cell; result "release"
+Node state 2                          → DONE:       kv_delete(I); empty skeleton; result "done"
+```
+
+Rules:
+
+* **Keys are generated only from `random_bytes`** (host CSPRNG). No derivation from the service key, no HKDF
+  from any master secret: a derived key cannot be deleted.
+* **One key per `I`, ever.** RECOMMIT reuses the stored key. The service never overwrites an existing `kv` entry
+  for `I`.
+* **Deletion.** The service deletes on DONE (after it has *seen* its own release committed — that is the next run
+  that finds state 2), on CANCELLED and on DROPPED. Cancellation deletion does not depend on the service: the
+  `delete_on_consume` rule set at keygen is executed by the CSR host when the Alive Cell dies, "even if the
+  service is disabled".
+* **Idempotent and race-safe.** Every branch may run any number of times; a lost race (another of the runner's own
+  runs committed first) just lands in the next state. Runs are short: HOLD costs one `cells_query` and two
+  `chain_read`s.
+* **No wall clock.** Only `block_info.median_time` is consulted, and the lock's `since` is what decides.
+* **Skeleton capacity.** The recreated Node Cell has exactly the input's capacity; the run fee comes from the job
+  (CSR). The skeleton carries the `crt-node-lock` code cell as a cell dep (and the Alive Cell dep on release).
+* **Result** (`result_put`, ≤ 64 bytes): `"CRT1" ‖ status byte ‖ T`, status `0 hold, 1 keygen, 2 recommit,
+  3 release, 4 done, 5 cancelled, 6 dropped, 7 key_lost, 8 bad_args, 9 bad_payload`. Shown on the runner's Jobs
+  page; nothing else leaves the runner.
+
+### 5.4 Cycle budget
+
+Measured on devnet (phase 05). Expected: HOLD < 2 M cycles; KEYGEN/RELEASE ≈ 10–40 M (one scalar
+multiplication with `k256`, no_std). `max_cycles` of the job cells defaults to 100 M with that headroom.
+
+### 5.5 Deployment data cell
+
+`CRT_CODE_HASH` must not depend on the network, so the per-network constants travel in one **data cell** named by
+the manifest (`data_cells[0]`), 97 bytes:
+
+```text
+CrtDeployment { version u8 = 1, network_id u8, node_lock_code_hash [u8;32], node_lock_outpoint [u8;36],
+                type_id_code_hash [u8;32] = 0x…545950455f4944 (hash_type type is implied) }
+```
+
+With a data cell the service ID is the composite form of `spec/service-manifest.md` §4 and includes
+`data_hash_1`; `crt-enable.sh` and the client both compute it that way. The data hash is also pinned in
+`deployments/<network>.json`.
+
+---
+
+## 6. Lifecycle (who signs what)
+
+| Transaction | Inputs | Outputs | Signer |
+|---|---|---|---|
+| **Create** | owner cells | Alive Cell; `n` Node Cells (state 0, deadline, owner, `descriptor_hash = 0`); `n` keygen jobs; `n` heartbeat jobs; optional organiser fee; change | owner |
+| **Commit** (×n) | runner wallet, keygen job, Node Cell_i | runner wallet + tip, job refund, Node Cell_i (state 1) | runner_i (CSR) |
+| **Arm** | `n` Node Cells (state 1) | same, `descriptor_hash` set | owner |
+| **Heartbeat** (×n, every `HEARTBEAT`) | runner wallet, heartbeat job | runner wallet + tip, heartbeat job (runs−1) | runner_i (CSR) |
+| **Renew** | `n` Node Cells | same, new `deadline`; `n` new heartbeat jobs for the extension | owner |
+| **Rewrap** | old Node Cells (destroyed), owner cells | new Node Cells for the new set (state 0), new keygen and heartbeat jobs; later a new Arm | owner |
+| **Release** (×n) | runner wallet, heartbeat job, Node Cell_i (`since`) | runner wallet + tip, job, Node Cell_i (state 2) ; dep: Alive Cell | runner_i (CSR) |
+| **Cancel** | Alive Cell, optionally all Node Cells | nothing with type-id `T`; refunds | owner |
+| **Reclaim** | Node Cells (any state), expired jobs | owner | owner |
+
+Notes:
+
+* **Create is one transaction** (resolves gap 1 of the design review). Nothing in it depends on the nodes' keys;
+  the keys come later into cells that already exist. The user can walk away after Create and lose nothing but
+  the keygen tips.
+* **Arm** is the second user transaction. Until it is sent, the switch is not usable for encryption (the client
+  refuses to wrap a key to an unanchored descriptor). The client waits for all `n` Node Cells to reach state 1,
+  verifies each (§8.3), builds the descriptor, then sends Arm.
+* **Renewal does not touch the Alive Cell** (resolves gap 2). CSR job cells cannot be extended, so renewal posts
+  new heartbeat jobs; the old ones run out on their own. Renew when about one `HEARTBEAT` of runs remains to
+  avoid paying both; the client shows the overlap cost.
+* **Rewrap** drops old runners by destroying their Node Cells (owner path). Each dropped runner's service finds
+  no Node Cell on its next heartbeat → DROPPED → deletes the key. This deletion is service-enforced, not host-
+  enforced; the host rule still deletes on cancel.
+* **Release after cancel is impossible** (dep rule) and **cancel after release is harmless** (the value is in
+  history).
+* **Reorgs** (gap 3): a release is as final as its transaction. CSR's `delete_on_consume` acts on observing the
+  consumed cell without a confirmation depth; a reorg that uncommits a cancel after the host deleted the key
+  destroys the switch. Documented residual risk; a configurable depth is proposed to CSR as a follow-up.
+
+### 6.1 Headroom
+
+Reported separately, never averaged: `threshold headroom = armed_in_set − t`, `mandatory headroom =
+armed_mandatory − j`. "Armed" = Node Cell in state 1 **and** the runner's last heartbeat run is younger than
+`3 × HEARTBEAT` blocks (read from the heartbeat job cell's recreation history or the runner's registry
+attestation). Overall headroom = minimum of the two.
+
+---
+
+## 7. Keys, envelopes and access trees (client side)
+
+Nodes are blind to all of this. They hold one key each and know nothing about thresholds, peers or mandatory
+flags.
+
+### 7.1 Secret and shares
+
+* `K` = 32 random bytes (the application's content key or the key that wraps it).
+* **Shamir `t`-of-`n`** over GF(2^8) (polynomial `0x11b`), byte-wise, `x = 1..n`. Share_i = `x (1 byte) ‖ y (32 bytes)`.
+* **XOR** for AND: `K = K_A ⊕ K_B ⊕ …`, each branch itself a Leaf or a Threshold.
+* **Share commitment** = `blake2b256("CRT/v1/share" ‖ share_i)`, in the descriptor, so a wrong release value is
+  identified immediately.
+
+### 7.2 Envelope `CRT-ENV-v1`
+
+Wraps one share (or branch secret) `m` to a node's `pubkey P`:
+
+```text
+(e, E) ← fresh secp256k1 key pair
+s     = x-coordinate of e·P                                   (32 bytes)
+key   = HKDF-SHA256(ikm = s, salt = "CRT-ENV-v1", info = E ‖ P, L = 32)
+nonce = 12 random bytes
+ct    = AES-256-GCM(key, nonce, aad = I ‖ tree_position (u16 BE), m)
+envelope = E (33) ‖ nonce (12) ‖ ct (|m| + 16)
+```
+
+Unwrapping with the released `d`: `s = x(d·E)`. Primitives: `@noble/secp256k1`, `@noble/hashes` (HKDF), WebCrypto
+AES-GCM; the recovery kit inlines them (no network, no CDN).
+
+### 7.3 Access tree
+
+```json
+{ "kind": "threshold", "t": 5, "n": 8, "leaves": [ {"node": 0}, {"node": 1}, … ] }
+{ "kind": "xor", "branches": [ {"kind": "threshold", "t": 2, "n": 3, "leaves": […]},
+                               {"kind": "threshold", "t": 5, "n": 8, "leaves": […]} ] }
+```
+
+`node` indexes `descriptor.nodes[]`. `tree_position` of a leaf = its index in a depth-first walk. v0.1 clients
+MUST support `threshold` and `xor(threshold, threshold)`; mandatory branches are `threshold` with small `n`
+(recommended `2-of-3`; `1-of-1` on a term > 1 year only with explicit acknowledgement). Effective control of a
+runner appearing in several leaves is shown as such.
+
+Standing trade, quoted at the point of choice: *every mandatory node makes the secret harder to steal and easier
+to lose, one for one.*
+
+---
+
+## 8. Descriptor and recovery kit
+
+### 8.1 Recipient descriptor
+
+Signed by nothing (its anchor is the chain), canonicalised with JCS (RFC 8785):
+
+```json
+{
+  "version": 1,
+  "network_id": 1,
+  "type_id": "0x…T…",
+  "identity": "0x…I…",
+  "created_at": 1763000000,
+  "deployment": { "node_lock_code_hash": "0x…", "crt_code_hash": "0x…", "crt_data_hash": "0x…" },
+  "alive_cell": { "tx_hash": "0x…", "index": 0 },
+  "nodes": [
+    { "runner_lock_hash": "0x…R…", "service_pubkey": "0x02…", "peer_id": "Qm…",
+      "node_cell": { "tx_hash": "0x…", "index": 1 }, "pubkey": "0x02…", "label": "my own runner" }
+  ],
+  "access_tree": { … },
+  "share_commitments": ["0x…", …],
+  "coordinator_url": "https://crt.chainsolution.net"      // informational
+}
+descriptor_hash = blake2b256( "CRT/v1/descriptor" ‖ JCS(descriptor without descriptor_hash) )
+```
+
+The body is **never on chain** (it is a coalition targeting map). Only `descriptor_hash` is, in every Node Cell.
+Envelopes are **not** part of the descriptor: the application produces them when it encrypts (§7.2) and stores
+them with its ciphertext; the kit carries both.
+
+### 8.2 Recovery kit (single HTML file)
+
+`crt-kit.html`, generated from `{descriptor, envelopes, application?}`:
+
+* a printable **certificate** page: creation time, deadline, network, tree diagram, node list with `R` and
+  `pubkey`, `descriptor_hash`, Alive Cell out point, the release instructions in plain language for someone who
+  has never heard of CKB;
+* embedded `descriptor.json` and `envelopes.json` (`<script type="application/json">`);
+* embedded zero-dependency recovery code: **(a)** online: query a CKB JSON-RPC (`get_cells` by lock script
+  `crt-node-lock`, args prefix `T`) from a user-editable list (default: public nodes of the network), read every
+  Node Cell in state 2, verify `pubkey(privkey) == pubkey`, unwrap, check commitments, combine → `K`; **(b)**
+  offline: paste release values by hand;
+* self-verification on open: recomputes `descriptor_hash` and shows MATCH / MISMATCH against the value printed on
+  the certificate (and, online, against the Node Cells);
+* an **application slot**: `window.CRT_KIT.application = {name, version, payload}` plus a `<script>` the
+  application appends; the kit calls `window.crtApplication?.onKey(K)` after recovery and exposes
+  `window.CRT_KIT.api = { readSwitch(), collectReleases(), recover(releases) }` and a `<div id="crt-application">`
+  for the application's own UI, so an application never duplicates chain or recovery code. The `dead-man-switch`
+  vault is a CRT kit with its ciphertext in the payload and a decrypt-and-show step in that hook.
+
+Requirements: opens from a USB stick in 2040 (no CDN, fonts, frameworks or build-time URLs); prints legibly in
+black and white; reproducible byte-for-byte from `{descriptor, envelopes, application}` with the same kit
+version; smaller than 400 KB.
+
+### 8.3 Hard-fail verification (client)
+
+Before building a descriptor or wrapping a key, the client verifies for each node, **and refuses on any failure
+with no override of any kind** (no flag, no config key, no "continue anyway"):
+
+1. the Node Cell is live, its lock `code_hash` is the deployment's `node_lock_code_hash` with `hash_type data2`,
+   its args are `T ‖ R`;
+2. `R` is the runner lock hash of a live CSR registry cell (`RegistryV3`) with `network == network_id`; the
+   registry's `service_pubkey` is the one recorded;
+3. the cell is in state 1 with a valid compressed pubkey;
+4. `deadline`, `owner_lock_hash` and (after Arm) `descriptor_hash` are identical across all `n` cells;
+5. the Alive Cell is live with type-id args `T` and data `43525401`.
+
+The chain itself guarantees that only runner `R` could have written the pubkey (§4.2), so no separate attestation
+signature exists in v0.2.
+
+---
+
+## 9. Runner selection and the directory
+
+The client (or the coordinator) builds its candidate list from public data only:
+
+* CSR registry cells on the network (`get_cells` by the `csr-registry` type script): `R`, `service_pubkey`,
+  `peer_id`, `stake`, `expiry_ms`, `endpoint`;
+* the CSR Network Monitor public API (`spec/monitor-public-api.md`): rank, availability 7/30/365 d, `check_type`,
+  `stake.status`, attestation status, coarse location;
+* **CRT-specific**: whether the runner has the CRT service enabled — visible only through its behaviour. The
+  client therefore keeps a public **CRT runner list** (`deployments/<network>-runners.json`, maintained by PR and
+  mirrored by the coordinator) of runners that announced CRT, and marks each with observed performance: number of
+  switches served (Node Cells with its `R`), median blocks from Create to Commit, heartbeat regularity. Every
+  figure is recomputable from the chain.
+
+Selection defaults: only `stake.status == deposited` and `attestation.status == valid`; `check_type ==
+p2p_verified` preferred; at most one runner per declared country/ASN cell; new runners marked *unproven*, not
+penalised. Coalition risk (operator / ASN / country concentration of the chosen set) is shown before Create.
+
+---
+
+## 10. Monitoring and risk posture
 
 | Term | Recommended structure |
 |---|---|
-| Under 1 year | Threshold only, no mandatory node (default) |
-| 1–3 years | Wider node set, more headroom |
-| 3+ years | Wide set **plus** a 2-of-3 mandatory branch **plus** rewrap at every renewal |
+| < 1 yr | threshold only, e.g. 5-of-8 |
+| 1–3 yr | wider set, e.g. 6-of-12 |
+| > 3 yr | wide set + 2-of-3 mandatory on owner-controlled runners, rewrap at every renewal; never 1-of-1 |
 
-### 9.1 Descriptor rot
-
-The principal long-term risk is node closure. The repair is **rewrap at renewal**, which requires the owner to still be able to reach `K` — so the application stores `E(K)` under a wallet-derived wrapping key.
-
-### 9.2 Headroom reporting
-
-Two figures, **reported separately and never averaged**:
-
-- `threshold headroom` — how many non-mandatory nodes can vanish before the threshold branch fails;
-- `mandatory headroom` — the same for each mandatory branch.
-
-Overall status is the **minimum** across branches. An average would report a switch as healthy while its mandatory branch was one closure from unrecoverable.
-
-### 9.3 Closure warnings
-
-The coordinator publishes headroom **as data**, with webhooks. Applications notify their own users.
-
-The coordinator does not collect user email addresses. Storing contact details next to condition ids would turn the coordinator into a correlation target linking real identities to pending switches.
-
-### 9.4 Node exit
-
-A node must give **on-chain notice** before closing, keep serving through a mandatory notice period, and may unbond only after that period expires. <!-- TODO: notice period length is open question O-3 -->
-
----
-
-## 10. Quantum posture
-
-secp256k1 throughout. **No post-quantum claim is made.** This is defensible because the expected term is under a year.
-
-The web interface must display a disclaimer **at the point where the user chooses a deadline** — not buried in terms of service — whenever the term exceeds five years, stating that secp256k1 is not quantum-resistant and that rewrap is the migration path.
+* **Descriptor rot** (runners leaving) is the principal long-term risk; repair = rewrap at renewal.
+* **Withholding**: a runner that stops heartbeating or does not release loses only future tips. The threshold is
+  the defence. A runner's heartbeat history is public (its job cell is recreated on chain each run), so
+  withholding is visible early.
+* **Premature release**: impossible on chain (`since`); off-chain leak of `d` is unverifiable and unpreventable in
+  any design, including v0.1-draft's slashing (which only punished *on-chain* evidence).
+* **Bootstrap**: "run your own CSR runner, enable CRT, mark it mandatory". Early security comes from the owner's
+  runner; the network is defence in depth until `n` grows.
+* **Quantum**: secp256k1, no PQ claim. Mandatory disclaimer at the deadline picker for terms > 5 years.
 
 ---
 
 ## 11. Economics
 
-### 11.1 Creation transaction
+Reference at CKB = $0.01, defaults of §3.3, `HEARTBEAT` = 8 000 blocks ≈ 1 day.
 
-All CKB for creating a switch comes from the user's wallet, in **one transaction with three outputs**:
-
-1. the Alive Cell,
-2. the Job Cell (fee escrow),
-3. the organiser service fee.
-
-### 11.2 Claim schedule
-
-**10% setup / 80% retainer vesting quarterly / 10% completion.**
-
-Terms shorter than one quarter pay the retainer as a single payment at resolution.
-
-The completion portion is claimable on release **only by a node that actually published its release value**, and is also released on **cancellation**. Without paying on cancellation, a node has no economic reason ever to delete anything.
-
-### 11.3 Proof of possession
-
-Each quarterly claim is gated on a proof of possession. The node signs
-
-```
-blake2b256( "TMN/v1/pop" || T || block_hash(H) )
-```
-
-with the per-condition private key. Because the message is chain-derived, it cannot be precomputed.
-
-The point of the timing: this catches a node that deleted its cold keys at its **next quarterly claim** — months after defecting, while its stake is still bonded and while the user can still rewrap — instead of at release, when it is too late for everybody.
-
-### 11.4 Reference pricing
-
-At CKB = $0.01:
-
-| Item | Amount |
-|---|---|
-| Node fee | 150 CKB per node per year (minimum term 3 months, minimum 400 CKB) |
-| Registry pool | +20% surcharge |
-| Organiser fee | 100 create / 50 renew / 50 top-up / **0 cancel** |
-| Alive Cell | ~150 CKB (refundable capacity) |
-| Job Cell overhead | ~130 CKB (refundable capacity) |
-| **8 nodes, 1 year** | **≈ 1,541 CKB spent (~$15.40)** |
-
-**Node revenue is a volume business.** At 150 CKB per switch per year, a launch-phase node is a contribution to the network, not income. This must be said to prospective operators up front, in these words, not discovered by them in month four.
-
-Claim **batching** — one transaction per node per quarter across all its switches — is a v0.1 requirement, not an optimisation. Without it, per-claim network fees eat the fee.
-
-### 11.5 The organiser fee is bypassable
-
-By design. A user who builds their own transaction pays no organiser fee, and nodes still serve the switch because a node only checks that the Job Cell is funded. If there is no service, there is no fee.
-
-The implication is [§8.5](#85-standalone-operation): the client must work standalone.
-
-### 11.6 Registry pool
-
-The 20% surcharge funds a separate public pool for watchtower bounties, liveness monitoring, reference hosting and audits.
-
-In v0.1 it is controlled by the founding operator under a published policy. **This is a centralisation point and is labelled as one.** The intended path is an operator multisig; the transition is [open question O-6](#13-open-questions).
-
----
-
-## 12. Relation to drand and to Sarcophagus
-
-### 12.1 drand and tlock
-
-| | drand / tlock | CRT |
+| Item | Amount | Spent / locked |
 |---|---|---|
-| Membership | Fixed federation (League of Entropy) | Permissionless, staked |
-| Key material | One long-lived threshold BLS group share | Fresh secp256k1 keypair **per switch** |
-| Release value | Beacon signature over a round number | The per-condition private key |
-| Condition | Round number = wall-clock schedule | CKB predicate: cell exists **and** chain time passed |
-| Cancellation | Impossible | The primitive |
-| Blast radius of a threshold collusion | Every ciphertext ever produced, retroactively | One switch |
-| Cost per item | Zero | ~1,500 CKB per switch-year at 8 nodes |
-| Latency, dependencies | None; no chain, no wallet | CKB RPC, a wallet, a funded escrow |
-| Operating history | Years, in production | None |
+| Keygen tip | 1 CKB per runner | spent |
+| Heartbeat tip | 0.5 CKB per runner per run → ≈ 183 CKB per runner-year (365 runs, with fee) | spent |
+| Organiser fee (optional output to the client/coordinator operator) | default 50 CKB per Create, 0 per Cancel | spent |
+| Network fees | < 1 CKB per user transaction | spent |
+| Alive Cell | ≈ 61–130 CKB | locked, back on cancel |
+| Node Cell | 244 CKB per runner | locked, back on reclaim |
+| Keygen job cell | ≈ 288 CKB per runner | locked for hours, back at commit minus tip |
+| Heartbeat job cell | ≈ 295 CKB + 365 × 0.502 CKB per runner-year | locked, unspent part back at the end |
 
-**Why drand cannot simply add revocation.** The beacon signs round numbers on a single global schedule, and every ciphertext targeting round *N* depends on the same signature. Cancelling one item would mean withholding a value the entire world is waiting for. Revocation requires per-item key custody — precisely the cost drand refuses in order to scale to a free public beacon. Add to that the long-lived group share, which cannot be deleted and therefore makes "unrecoverable forever" unstateable.
-
-**Where drand is better and should be used instead:** free, instant, no wallet, no chain, no dependency on a paid node business staying solvent, and a real track record. If your use case is a sealed bid, a commit-reveal, or a scheduled disclosure you will never want to stop, use tlock and ignore this repository.
-
-### 12.2 Sarcophagus
-
-Sarcophagus was an Ethereum + Arweave decentralised dead man's switch. Bonded operators — "archaeologists" — held key shards for an "embalmer", were paid to hold them, were slashed for failing to release, and released at a resurrection time unless the owner pushed it back. The node economics were close to identical to [§11](#11-economics). The project has since wound down. <!-- TODO: link the wind-down announcement before publishing; verify current status -->
-
-That prior art is the most important input to this design, and the lessons are not cryptographic:
-
-- **Demand was the binding constraint.** The protocol worked. Not enough people paid for a decentralised dead man's switch to sustain the operator set. No amount of better secret sharing fixes that, and CRT should not pretend otherwise.
-- **Operator economics were thin.** Same risk here, quantified in [§11.4](#114-reference-pricing) rather than glossed.
-- **Coupling to a storage layer added cost and lock-in.** Sarcophagus carried the payload to Arweave. CRT's [§1.2](#12-out-of-scope) refusal to touch user data is a direct response.
-- **The product was an application, not a primitive.** An inheritance product has one narrow market. A revocable timelock has several, of which inheritance is one.
-
-**What CRT changes deliberately:** cancellation is the first-class operation rather than a side effect of a missed renewal; keys are per-condition and CSPRNG-fresh rather than long-lived or derived; the coordinator cannot initiate any transaction and therefore cannot hold a switch hostage; the condition is anchored in a cell the *user* locks; and the fee path is bypassable, so the network survives the organiser.
-
-**What is still unsolved:** demand, and operator economics. Both are business problems and neither is answered in this document.
-
----
-
-## 13. Open questions
-
-| Id | Question |
+| Scenario (8 runners, 1 year) | CKB |
 |---|---|
-| O-1 | Threshold behaviour at small `n` — what is the minimum viable node set at launch? |
-| O-2 | CKB price volatility over a multi-year escrow: fixed CKB, pegged, or top-up? |
-| O-3 | Notice period length for node exit ([§9.4](#94-node-exit)) |
-| O-4 | Rewrap when the owner is already dead — an executor who can rewrap but not release |
-| O-5 | Should a node tell a stranger which `I` it serves? Privacy versus auditability |
-| O-6 | Registry pool governance transition to an operator multisig ([§11.6](#116-registry-pool)) |
-| O-7 | Domain-separator prefix: keep `TMN/v1` or move to `CRT/v1` before freezing scripts |
-| O-8 | `GRACE` constant value ([§4.3](#43-predicate)) |
+| Spent: 8 × (1 + 183) + 50 + fees | ≈ **1 530** (≈ $15) |
+| Locked after commit (Alive + 8 × (244 + 295)) | ≈ **4 440** (≈ $44), refundable |
+| Locked during the first hours (+ 8 × 288) | ≈ 6 740 |
 
-Argue with these in Discussions, not in issues.
+A runner earns ≈ 183 CKB per switch-year; as in v0.1-draft, a launch-phase runner is a contribution, not income,
+and `docs/operators.md` says so first. CSR's own costs (10 000 CKB DAO stake, 700 CKB runner wallet) are the
+runner's and are documented by CSR.
+
+Cancel carries no fee and is never harder in the UI than Create.
 
 ---
 
-## 14. Changelog
+## 12. Threat model
 
-- `v0.1-draft` — first public form. Adapted from the private *TimeMachine Network* design note v0.3.
+Defends against: any sub-threshold set of dishonest runners; a malicious coordinator (it signs nothing, holds no
+keys, and every datum it serves is verifiable against the chain); *later* compromise of an honest runner (the key
+is gone after release or cancel); premature on-chain release (consensus); fake release values (lock verifies
+`pubkey(d)`); descriptor tampering (hash on chain, in `n` cells).
+
+Does not defend against: a threshold-sized coalition (design limit, mitigated by diversity scoring and per-switch
+keys); a runner dishonest from the first day (it can copy `d` before storing it — deletion is unverifiable; the
+client says so); runner closure beyond headroom (a lost mandatory runner is fatal; the UI shows it daily); loss
+of the owner wallet; CSR host compromise on a runner (equivalent to a dishonest runner); the residual reorg risk
+of §6.
+
+Privacy: Node Cells reveal the runner set and the deadline of every switch (not the tree, not the thresholds,
+not the mandatory flag). This resolves O-5 towards auditability: the set is public, the structure is not.
+
+---
+
+## 13. Components
+
+| Directory | Language | Contents |
+|---|---|---|
+| `contracts/crt-core` | Rust `no_std` | `NodeCellData`, payload and identity helpers, secp256k1 pubkey derivation (`k256`), GF(2^8) is **not** here (client only) |
+| `contracts/crt-node-lock` | Rust `ckb-std` | §4, tests with `ckb-testtool` |
+| `service/crt-service` | Rust `ckb-std` (CSR service) | §5, unit tests of the state machine against a mock host, devnet integration |
+| `client/` | TypeScript (ESM, browser + Node) | identity, access trees, envelopes, descriptor + JCS, hard-fail verification, CCC transaction builders, kit generator, offline recovery; conformance vectors |
+| `web/` | TypeScript + the static `site/` | reference client UI at `crt.chainsolution.net/app` |
+| `deployments/` | JSON | per-network code hashes, out points, CSR deployment references, CRT runner list |
+| `scripts/` | bash | `crt-enable.sh` (operators), devnet end-to-end, release packaging |
+| `coordinator/` | v0.2 | directory, mirror, unsigned tx service (spec in `coordinator/README.md`) |
+
+Shared conformance vectors live in `spec/vectors/` and are checked by the Rust and the TypeScript test suites.
+
+---
+
+## 14. CSR requirements
+
+CRT v0.1 needs exactly one change in CSR, specified in `aiworker/00-csr-random-bytes.md` for the
+`ckb-service-runner` repository:
+
+* **`random_bytes(addr, len)` (7050)**: fill `len ≤ 1024` bytes from the host's CSPRNG; local mode too. Return 0,
+  or 11 when `len > 1024`.
+
+Already present and relied on: `kv_*` with `kv_mark_secret` and `delete_on_consume`; `cells_query` (prefix match,
+≤ 64 cells); `chain_read`; `block_info` median time; `tx_skeleton_put` with skeleton `since` and cell deps;
+local manifests with `args`; composite service IDs with data cells.
+
+Proposed, not required: a confirmation depth for `delete_on_consume`; `csr service add-onchain --args` so that an
+operator can enable a catalog service with runner-specific args in one click.
+
+---
+
+## 15. Open questions
+
+| Id | Question | Status |
+|---|---|---|
+| O-1 | Minimum viable runner set at launch | open; client refuses `n < 3` and warns below `n = 5` |
+| O-2 | CKB price volatility on multi-year terms | resolved for v0.1: tips are fixed in CKB at creation; renew re-quotes |
+| O-3 | Runner exit notice | inherited from CSR (registration removal); the heartbeat history shows a silent exit within 3 × `HEARTBEAT` |
+| O-4 | Rewrap by an executor who may not release | open (executor lock on the Node Cells' owner path is possible: `owner_lock_hash` may be a multisig) |
+| O-5 | Node privacy | resolved: set public, structure private (§12) |
+| O-6 | Registry pool governance | dropped with the pool |
+| O-7 | Prefix | resolved: `CRT/v1` |
+| O-8 | `GRACE` | resolved: 24 h |
+| O-9 | `delete_on_consume` without confirmation depth (reorg) | proposed to CSR |
+| O-10 | Heartbeat overlap at renewal | accepted cost; a CSR `Every` job top-up would remove it |
+| O-11 | Should the service also prove possession on chain at heartbeat (a signature with `d` in the result or a cell)? | deferred: costs capacity per run; the commit tx already proves the runner had `d` once, and release proves it had it at the end |
+
+---
+
+## 16. Changes from v0.1-draft and the concept note
+
+* Built on CSR: no CRT node software, registry, stake, slashing or node API.
+* Alive Cell is immutable; `deadline` and `descriptor_hash` moved to the Node Cells.
+* Node Cell replaces the Job Cell merkle root, the per-condition pubkey attestation and the release endpoint.
+* Keygen and release are on-chain transactions of the runner, enforced by `crt-node-lock`.
+* Create is one transaction; Arm is a second user transaction (resolves gap 1).
+* Heartbeat jobs replace quarterly PoP claims and the 10/80/10 schedule.
+* Prefix `CRT/v1`, `GRACE` 24 h, section numbers frozen.
+* Node API, coordinator API and `node/`, `coordinator/` contracts of v0.1-draft are historical; the coordinator
+  is v0.2 and optional.

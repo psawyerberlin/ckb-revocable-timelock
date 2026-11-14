@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CRT — CKB Revocable Timelock</title>
+<meta name="description" content="Timelock encryption with a working cancel button, built on Nervos CKB and CKB Service Runner. Encrypt to a date; keep the right to say no.">
+<link rel="stylesheet" href="/assets/site.css">
+<link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="/">CRT <span>CKB Revocable Timelock</span></a>
+  <nav>
+    <a href="/" aria-current="page">Overview</a>
+    <a href="/how-it-works.html">How it works</a>
+    <a href="/operators.html">Run a node</a>
+    <a href="/developers.html">Build on it</a>
+    <a href="/faq.html">Questions</a>
+    <a href="https://github.com/psawyerberlin/ckb-revocable-timelock">Source</a>
+  </nav>
+</header>
+
+<section class="hero">
+  <h1>Encrypt to a date. Keep the right to say no.</h1>
+  <p class="lede">CRT gives you a public key today and the matching private key on a day you choose — published on the Nervos CKB chain by independent node operators. Until then, nobody can decrypt. And if you change your mind, one transaction cancels it for good: the condition can never hold again, and every node deletes its key.</p>
+  <div class="cta">
+    <a class="btn primary" href="/app/">Open the app (testnet)</a>
+    <a class="btn" href="/how-it-works.html">Read how it works</a>
+    <span class="small">Open protocol, MIT licence, no account.</span>
+  </div>
+
+  <figure class="life" aria-labelledby="lifecap">
+    <svg viewBox="0 0 1100 300" role="img" aria-label="Lifecycle of a switch: create, hold with daily heartbeats, then either release after the deadline or cancel at any time.">
+      <line class="rail-line draw" x1="40" y1="120" x2="760" y2="120"/>
+      <line class="rail-release draw" x1="760" y1="120" x2="1060" y2="120"/>
+      <line class="tick" x1="40" y1="108" x2="40" y2="132"/>
+      <line class="tick" x1="640" y1="104" x2="640" y2="136"/>
+      <line class="tick" x1="760" y1="108" x2="760" y2="132"/>
+      <g class="heart">
+        <path d="M110 120 l12 -22 l12 22 M220 120 l12 -22 l12 22 M330 120 l12 -22 l12 22 M540 120 l12 -22 l12 22 M600 120 l12 -22 l12 22"/>
+      </g>
+      <text class="t" x="40" y="160">Create</text>
+      <text class="t small" x="40" y="178">one wallet transaction</text>
+      <text class="t small" x="40" y="194">Alive Cell · n Node Cells · n jobs</text>
+
+      <text class="t" x="250" y="62" text-anchor="middle">Hold</text>
+      <text class="t small" x="250" y="80" text-anchor="middle">each runner runs a heartbeat job, is paid a tip,</text>
+      <text class="t small" x="250" y="96" text-anchor="middle">checks the chain — and publishes nothing</text>
+
+      <text class="t" x="640" y="160" text-anchor="middle">Deadline</text>
+      <text class="t small" x="640" y="178" text-anchor="middle">chain median time,</text>
+      <text class="t small" x="640" y="194" text-anchor="middle">renewable</text>
+
+      <text class="t" x="760" y="160" text-anchor="middle">+ 24 h</text>
+      <text class="t small" x="760" y="178" text-anchor="middle">grace</text>
+
+      <rect class="box box-release" x="810" y="52" width="250" height="44" rx="2"/>
+      <text class="t" x="935" y="71" text-anchor="middle">Release</text>
+      <text class="t small" x="935" y="87" text-anchor="middle">private keys written on chain, forever</text>
+      <text class="t small" x="935" y="160" text-anchor="middle">anyone with the kit recovers the secret</text>
+      <text class="mono" x="935" y="178" text-anchor="middle">pubkey(d) = P · since ≥ deadline + 24 h</text>
+
+      <line class="cut" x1="440" y1="98" x2="470" y2="142"/>
+      <line class="cut" x1="470" y1="98" x2="440" y2="142"/>
+      <path class="rail-cancel draw" d="M455 120 L455 230 L505 230" fill="none"/>
+      <rect class="box box-cancel" x="505" y="208" width="285" height="44" rx="2"/>
+      <g class="cancel-label">
+        <text class="t" x="645" y="227" text-anchor="middle" style="fill:var(--cancel)">Cancel — any time before release</text>
+        <text class="t small" x="645" y="243" text-anchor="middle">consume the Alive Cell; every key is deleted</text>
+        <text class="t small" x="645" y="280" text-anchor="middle">the condition can never be true again · no fee</text>
+      </g>
+    </svg>
+    <figcaption id="lifecap">One switch, from creation to its two possible ends. Everything on the top rail is public chain state; the only secrets are the keys inside the runners' sandboxes, and they exist for exactly one switch.</figcaption>
+  </figure>
+</section>
+
+<main class="page">
+  <aside class="rail">
+    <ol>
+      <li><a href="#why">Why a cancel button</a></li>
+      <li><a href="#what">What CRT is</a></li>
+      <li><a href="#csr">Built on CSR</a></li>
+      <li><a href="#trust">What you have to trust</a></li>
+      <li><a href="#cost">What it costs</a></li>
+      <li><a href="#status">Status</a></li>
+    </ol>
+    <div class="status"><b>Status</b><br>Specification v0.2 complete.<br>Implementation in progress.<br>Testnet first; mainnet follows CSR.</div>
+  </aside>
+
+  <article>
+    <h2 id="why">Why a cancel button</h2>
+    <p>Timelock encryption as it exists today is a one-way ratchet. You pick a date, you encrypt, and the release will happen, because the release value is a public beacon the rest of the world depends on too. That is right for sealed bids and auction commitments. It is wrong wherever “I am still here” is the actual message: inheritance, escrow, a dead drop, a disclosure a court should be able to stop, a key you may want to take back.</p>
+    <p>CRT makes cancellation the primitive. Each switch gets its own keys, held by independent operators, so one switch can be cancelled without touching any other — and because the keys are per switch and deleted at the end, a compromise later costs one switch, not the archive.</p>
+
+    <h2 id="what">What CRT is — and is not</h2>
+    <div class="cols">
+      <div><h3>It gives you</h3><p>A set of public keys to encrypt to, bound to one on-chain cell and one deadline. Later, the matching private keys, published on chain. A single recovery file an heir can open offline in twenty years.</p></div>
+      <div><h3>It never touches</h3><p>Your data. CRT does not encrypt, store or move anything of yours. Applications do that — the first is <a href="https://dead-man-switch.chainsolution.net">dead-man-switch</a>, which encrypts a message or files in your browser and packs them into the recovery file.</p></div>
+      <div><h3>It cannot</h3><p>Stop a threshold of colluding operators (you choose how many, and from where). Prove that an operator deleted a key. Replace a lost wallet. Make any post-quantum claim.</p></div>
+    </div>
+
+    <h2 id="csr">Built on CKB Service Runner</h2>
+    <p>A CRT node is not a new piece of software. It is a <a href="https://github.com/ckb-service-runner/ckb-service-runner">CSR</a> runner — a CKB full node with the CSR sidecar — that has enabled the CRT service. CSR brings the parts a key-holding network is hardest to get right: operator registration with a 10,000 CKB Nervos DAO stake, a public ranking by an independent monitor, a sandbox with encrypted per-service storage, and paid jobs that any registered runner can pick up.</p>
+    <p>CRT adds one lock script, one small program for the sandbox, and a client library. The script makes a release impossible to commit before the deadline and impossible after a cancel; the program generates, holds, publishes and deletes one key per switch; the client builds the transactions, splits your secret across the nodes and writes the recovery file.</p>
+    <div class="note green">Release values are written into chain history. Once a switch has released, no server, node or website is needed to recover it — ever.</div>
+
+    <h2 id="trust">What you have to trust</h2>
+    <dl class="kv">
+      <dt>The chain</dt><dd>CKB consensus decides time (median of the last 37 blocks) and whether the Alive Cell still exists. Nothing else is a clock.</dd>
+      <dt>Fewer than <i>t</i> operators</dt><dd>You pick <i>n</i> runners and a threshold <i>t</i> (5-of-8 by default), optionally with a mandatory branch such as your own node. Any <i>t</i> can decrypt after release; any <i>t</i> could collude before it. The app shows the concentration of your choice by operator, network and country.</dd>
+      <dt>Not the website</dt><dd>This site and its app build unsigned transactions and read public data. They hold no keys, submit nothing, and can be replaced by a bare CKB RPC.</dd>
+      <dt>Not the recovery file’s source</dt><dd>The file checks itself against the hash anchored in the Node Cells when opened, and shows MATCH or MISMATCH before anything else.</dd>
+    </dl>
+
+    <h2 id="cost">What it costs</h2>
+    <table>
+      <thead><tr><th>8 runners, one year, defaults</th><th class="num">CKB</th><th>Comes back?</th></tr></thead>
+      <tbody>
+        <tr><td>Runner tips (1 keygen + 365 daily heartbeats, each runner)</td><td class="num">≈ 1 470</td><td>no — this is what pays the operators</td></tr>
+        <tr><td>Organiser fee (optional, set by the app; zero on cancel)</td><td class="num">50</td><td>no</td></tr>
+        <tr><td>Cells on chain (Alive Cell, 8 Node Cells, 8 job cells)</td><td class="num">≈ 4 440</td><td>yes — reclaimed when the switch ends</td></tr>
+      </tbody>
+    </table>
+    <p class="small">About $15 spent and $44 parked at $0.01 per CKB. Longer terms scale the tips; cells stay the same. Cancelling is free. Full table in <a href="https://github.com/psawyerberlin/ckb-revocable-timelock/blob/main/SPEC.md#11-economics">SPEC §11</a>.</p>
+
+    <h2 id="status">Status</h2>
+    <p>The protocol specification (v0.2, CSR edition) is complete and frozen in its numbering. The lock script, the service, the client library and this site’s app are being built spec by spec; each ships to testnet when its acceptance tests pass. Mainnet follows CSR’s own mainnet gate for the service runtime. Follow the <a href="https://github.com/psawyerberlin/ckb-revocable-timelock">repository</a>, or ask on <a href="https://t.me/ckbrunner">the CSR Telegram</a>.</p>
+  </article>
+</main>
+
+<footer>
+  <span>CRT — an open protocol on Nervos CKB. MIT.</span>
+  <a href="https://github.com/psawyerberlin/ckb-revocable-timelock/blob/main/SPEC.md">Specification</a>
+  <a href="https://github.com/ckb-service-runner/ckb-service-runner">CKB Service Runner</a>
+  <a href="https://csr-monitor.chainsolution.net">CSR network monitor</a>
+  <a href="https://dead-man-switch.chainsolution.net">dead-man-switch</a>
+</footer>
+</body>
+</html>

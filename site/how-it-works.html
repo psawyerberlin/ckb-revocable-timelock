@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How CRT works — CKB Revocable Timelock</title>
+<meta name="description" content="The cells, the lock script, the service inside CSR, the keys and the recovery file: how a CRT switch is created, held, released and cancelled.">
+<link rel="stylesheet" href="/assets/site.css">
+<link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="/">CRT <span>CKB Revocable Timelock</span></a>
+  <nav>
+    <a href="/">Overview</a>
+    <a href="/how-it-works.html" aria-current="page">How it works</a>
+    <a href="/operators.html">Run a node</a>
+    <a href="/developers.html">Build on it</a>
+    <a href="/faq.html">Questions</a>
+    <a href="https://github.com/psawyerberlin/ckb-revocable-timelock">Source</a>
+  </nav>
+</header>
+
+<main class="page">
+  <aside class="rail">
+    <ol>
+      <li><a href="#cells">Three kinds of cell</a></li>
+      <li><a href="#lock">The lock script</a></li>
+      <li><a href="#service">The service in the sandbox</a></li>
+      <li><a href="#keys">Your secret, split</a></li>
+      <li><a href="#kit">The recovery file</a></li>
+      <li><a href="#life">Renew, rewrap, cancel</a></li>
+      <li><a href="#limits">Limits, stated plainly</a></li>
+    </ol>
+    <div class="status">This page follows <a href="https://github.com/psawyerberlin/ckb-revocable-timelock/blob/main/SPEC.md">SPEC.md v0.2</a>. Section numbers in brackets point there.</div>
+  </aside>
+
+  <article>
+    <h1>How it works</h1>
+    <p class="lede">A switch is a handful of cells on the CKB chain, one small program running inside each chosen node, and one file in your hands. This page walks through them in the order they come into being.</p>
+
+    <h2 id="cells">Three kinds of cell <span class="small">[§3]</span></h2>
+    <dl class="kv">
+      <dt>Alive Cell</dt><dd>One per switch. Its type script is CKB’s <code>type-id</code>, so its 32-byte argument <code>T</code> is unique on the chain and can never be recreated once the cell is consumed. It is locked by your wallet and never updated. Consuming it without a replacement <b>is</b> cancellation.</dd>
+      <dt>Node Cell</dt><dd>One per chosen runner. Locked by CRT’s own script with <code>T</code> and the runner’s identity in the arguments. Holds the deadline, your wallet’s lock hash, the hash of the descriptor, and — written by the runner — first the public key, later the private key.</dd>
+      <dt>Job cells</dt><dd>Standard CSR job cells, two per runner: one “run now” job that triggers key generation within minutes, and one job that fires every day for the term and pays the runner a tip each time. Both name the runner-specific service ID, so only that runner can run them.</dd>
+    </dl>
+    <p>Creating a switch is one wallet transaction with all of these as outputs. Nothing in it depends on the runners; their keys arrive afterwards into cells that already exist.</p>
+
+    <h2 id="lock">The lock script <span class="small">[§4]</span></h2>
+    <p>The Node Cell lock has two paths. On the <b>owner path</b> — any input signed by your wallet — everything is allowed: change the deadline, write the descriptor hash, destroy the cell. On the <b>node path</b> — the runner’s own CSR transaction — exactly two transitions exist:</p>
+    <ol class="steps">
+      <li><div><b>Commit.</b> From “created” to “armed”: a valid compressed public key is written, nothing else changes, capacity is preserved.</div></li>
+      <li><div><b>Release.</b> From “armed” to “released”: a private key is written and the script checks three things — <code>pubkey(privkey)</code> equals the committed public key; the input’s <code>since</code> is an absolute timestamp of at least <code>deadline + 24 h</code>, which CKB consensus compares against the median time of the last 37 blocks; and the Alive Cell with <code>T</code> is present as a cell dependency, which a dead cell cannot be.</div></li>
+    </ol>
+    <p>Those three checks are the whole security argument on chain: a release cannot be committed early, cannot be committed after a cancel, and cannot be faked.</p>
+
+    <h2 id="service">The service in the sandbox <span class="small">[§5]</span></h2>
+    <p>Each runner executes CRT as a CSR <em>service</em>: a RISC-V program running in CKB-VM with no network, no filesystem and no clock, talking to the host through a small set of calls. Every job run executes the same decision table against chain state:</p>
+    <pre>no Alive Cell            → delete key, do nothing          (cancelled)
+no Node Cell for me      → delete key, do nothing          (dropped at rewrap)
+Node Cell created        → draw 32 random bytes from the host CSPRNG,
+                           store them encrypted, mark secret,
+                           bind deletion to the Alive Cell,
+                           commit the public key on chain
+Node Cell armed, early   → do nothing                      (heartbeat)
+Node Cell armed, due     → write the private key on chain  (release)
+Node Cell released       → delete key                      (done)</pre>
+    <p>Two properties matter. The key is drawn from randomness, never derived from anything the runner could recompute later — a derived key cannot be deleted. And deletion on cancel is done by the CSR host itself, through a rule the service registers at key generation, so it happens even if the operator has since disabled the service.</p>
+
+    <h2 id="keys">Your secret, split <span class="small">[§7]</span></h2>
+    <p>Runners know nothing about each other or about how many of them you chose. Your application generates a 32-byte secret <code>K</code>, splits it with Shamir’s scheme into <i>n</i> shares of which any <i>t</i> suffice, and seals one share to each runner’s public key (secp256k1 ECDH, HKDF, AES-GCM). A mandatory node — your own, say — is a second branch combined by XOR: without it, no number of other runners can recover <code>K</code>.</p>
+    <div class="note">Every mandatory node makes the secret harder to steal and easier to lose, one for one. The app says this at the moment you choose, not in a footnote.</div>
+    <p>Each share also gets a public commitment hash, so a node that releases garbage is identified immediately rather than silently breaking the reconstruction.</p>
+
+    <h2 id="kit">The recovery file <span class="small">[§8]</span></h2>
+    <p>Everything a future reader needs lives in one HTML file: a printable certificate (deadline, nodes, hashes, plain-language instructions), the descriptor, the sealed shares, and the code to recover. Opened in a browser — online or offline, from a USB stick — it recomputes the descriptor hash and shows MATCH or MISMATCH before anything else. Online, it reads the released keys straight from any CKB node; offline, you paste them. Applications add their own payload and a decrypt step, which is how <a href="https://dead-man-switch.chainsolution.net">dead-man-switch</a> turns the recovery file into a sealed letter.</p>
+    <p>The descriptor itself never goes on chain — it would name the nodes that hold your shares and which of them is mandatory. Only its hash does, in every Node Cell.</p>
+
+    <h2 id="life">Renew, rewrap, cancel <span class="small">[§6]</span></h2>
+    <dl class="kv">
+      <dt>Renew</dt><dd>One wallet transaction updates the deadline in the Node Cells and posts new heartbeat jobs. The Alive Cell, the keys and the recovery file do not change.</dd>
+      <dt>Rewrap</dt><dd>Change the node set: destroy the Node Cells of runners you drop, create new ones, wait for new commits, seal a fresh <code>K</code>, download a new file. Dropped runners find their cell gone and delete their key.</dd>
+      <dt>Cancel</dt><dd>Consume the Alive Cell with no replacement. The Node Cells can be reclaimed in the same transaction. No fee of any kind, ever — and in the app, never more clicks than creating.</dd>
+      <dt>Reclaim</dt><dd>After release or cancel, take the parked capacity of the cells back. The release values stay in chain history.</dd>
+    </dl>
+
+    <h2 id="limits">Limits, stated plainly <span class="small">[§12]</span></h2>
+    <ul>
+      <li>A threshold-sized coalition of your chosen runners can decrypt early. Choose them from different operators, networks and countries; the app shows the concentration.</li>
+      <li>A runner that is dishonest from the first day can copy its key before storing it. Deletion is a promise, verified only by the stake and reputation CSR attaches to it — which is why no single runner ever holds enough.</li>
+      <li>Runners leave. A lost mandatory node is fatal; a shrinking threshold margin is shown daily and repaired by rewrapping at renewal.</li>
+      <li>Node Cells reveal which runners serve a switch and when it is due. They do not reveal the threshold, the branches or the mandatory node.</li>
+      <li>secp256k1 everywhere; no post-quantum claim. Terms over five years get a warning and rewrap is the migration path.</li>
+    </ul>
+  </article>
+</main>
+
+<footer>
+  <span>CRT — an open protocol on Nervos CKB. MIT.</span>
+  <a href="https://github.com/psawyerberlin/ckb-revocable-timelock/blob/main/SPEC.md">Specification</a>
+  <a href="https://github.com/ckb-service-runner/ckb-service-runner">CKB Service Runner</a>
+  <a href="https://csr-monitor.chainsolution.net">CSR network monitor</a>
+  <a href="https://dead-man-switch.chainsolution.net">dead-man-switch</a>
+</footer>
+</body>
+</html>

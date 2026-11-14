@@ -1,0 +1,78 @@
+{
+ "description": "descriptor_hash = blake2b256(\"CRT/v1/descriptor\" || JCS(descriptor)) where JCS is RFC 8785 canonical JSON (for this integer/string-only subset: keys sorted by UTF-16 code units, no whitespace). SPEC.md section 8.1.",
+ "descriptor": {
+  "version": 1,
+  "network_id": 1,
+  "type_id": "0x1111111111111111111111111111111111111111111111111111111111111111",
+  "identity": "0x2e854a78b895939d284a957fed2aa32ed9ab9c24b1442c8616f52549d6020596",
+  "created_at": 1763000000,
+  "deployment": {
+   "node_lock_code_hash": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "crt_code_hash": "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+   "crt_data_hash": "0xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+  },
+  "alive_cell": {
+   "tx_hash": "0xdddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+   "index": 0
+  },
+  "nodes": [
+   {
+    "runner_lock_hash": "0x0101010101010101010101010101010101010101010101010101010101010101",
+    "service_pubkey": "0x020101010101010101010101010101010101010101010101010101010101010101",
+    "peer_id": "QmRunnerOne",
+    "node_cell": {
+     "tx_hash": "0xdddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+     "index": 1
+    },
+    "pubkey": "0x02aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "label": "runner one"
+   },
+   {
+    "runner_lock_hash": "0x0202020202020202020202020202020202020202020202020202020202020202",
+    "service_pubkey": "0x030202020202020202020202020202020202020202020202020202020202020202",
+    "peer_id": "QmRunnerTwo",
+    "node_cell": {
+     "tx_hash": "0xdddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+     "index": 2
+    },
+    "pubkey": "0x03bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "label": "runner two"
+   },
+   {
+    "runner_lock_hash": "0x0303030303030303030303030303030303030303030303030303030303030303",
+    "service_pubkey": "0x020303030303030303030303030303030303030303030303030303030303030303",
+    "peer_id": "QmRunnerThree",
+    "node_cell": {
+     "tx_hash": "0xdddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+     "index": 3
+    },
+    "pubkey": "0x02cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "label": "runner three"
+   }
+  ],
+  "access_tree": {
+   "kind": "threshold",
+   "t": 2,
+   "n": 3,
+   "leaves": [
+    {
+     "node": 0
+    },
+    {
+     "node": 1
+    },
+    {
+     "node": 2
+    }
+   ]
+  },
+  "share_commitments": [
+   "0x757dfd3054475ef2db3385d795948cfa2bad66050551fa3f4b9006a16bb12698",
+   "0x01e81cc78d6109eb5b92e2a403837f3ff4c73dda3c235ee4e71c8126f828ffa5",
+   "0x9511166414b7be5c7baaa7c7b1a9804a84fc8d4c8be16ece59a1a2204f1dd6c9"
+  ],
+  "coordinator_url": "https://crt.chainsolution.net"
+ },
+ "canonical": "{\"access_tree\":{\"kind\":\"threshold\",\"leaves\":[{\"node\":0},{\"node\":1},{\"node\":2}],\"n\":3,\"t\":2},\"alive_cell\":{\"index\":0,\"tx_hash\":\"0xdddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\"},\"coordinator_url\":\"https://crt.chainsolution.net\",\"created_at\":1763000000,\"deployment\":{\"crt_code_hash\":\"0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"crt_data_hash\":\"0xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\",\"node_lock_code_hash\":\"0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"identity\":\"0x2e854a78b895939d284a957fed2aa32ed9ab9c24b1442c8616f52549d6020596\",\"network_id\":1,\"nodes\":[{\"label\":\"runner one\",\"node_cell\":{\"index\":1,\"tx_hash\":\"0xdddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\"},\"peer_id\":\"QmRunnerOne\",\"pubkey\":\"0x02aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"runner_lock_hash\":\"0x0101010101010101010101010101010101010101010101010101010101010101\",\"service_pubkey\":\"0x020101010101010101010101010101010101010101010101010101010101010101\"},{\"label\":\"runner two\",\"node_cell\":{\"index\":2,\"tx_hash\":\"0xdddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\"},\"peer_id\":\"QmRunnerTwo\",\"pubkey\":\"0x03bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"runner_lock_hash\":\"0x0202020202020202020202020202020202020202020202020202020202020202\",\"service_pubkey\":\"0x030202020202020202020202020202020202020202020202020202020202020202\"},{\"label\":\"runner three\",\"node_cell\":{\"index\":3,\"tx_hash\":\"0xdddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\"},\"peer_id\":\"QmRunnerThree\",\"pubkey\":\"0x02cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\",\"runner_lock_hash\":\"0x0303030303030303030303030303030303030303030303030303030303030303\",\"service_pubkey\":\"0x020303030303030303030303030303030303030303030303030303030303030303\"}],\"share_commitments\":[\"0x757dfd3054475ef2db3385d795948cfa2bad66050551fa3f4b9006a16bb12698\",\"0x01e81cc78d6109eb5b92e2a403837f3ff4c73dda3c235ee4e71c8126f828ffa5\",\"0x9511166414b7be5c7baaa7c7b1a9804a84fc8d4c8be16ece59a1a2204f1dd6c9\"],\"type_id\":\"0x1111111111111111111111111111111111111111111111111111111111111111\",\"version\":1}",
+ "descriptor_hash": "0x979c044da0a699a56195e17e8479a26f2faee7d1a8f4c72af346c4ff7de9924b"
+}

@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Questions — CKB Revocable Timelock</title>
+<meta name="description" content="Common questions about CRT: drand, Sarcophagus, trust, cost, what happens when nodes disappear, and when mainnet opens.">
+<link rel="stylesheet" href="/assets/site.css">
+<link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="/">CRT <span>CKB Revocable Timelock</span></a>
+  <nav>
+    <a href="/">Overview</a>
+    <a href="/how-it-works.html">How it works</a>
+    <a href="/operators.html">Run a node</a>
+    <a href="/developers.html">Build on it</a>
+    <a href="/faq.html" aria-current="page">Questions</a>
+    <a href="https://github.com/psawyerberlin/ckb-revocable-timelock">Source</a>
+  </nav>
+</header>
+
+<main class="page wide">
+  <article>
+    <h1>Questions</h1>
+
+    <details open><summary>Why not drand / tlock?</summary>
+      <p>Use it. drand’s tlock is free, instant and needs no chain; for sealed bids and most timelock uses it is the right tool. What it structurally cannot offer is cancellation: one beacon value serves every ciphertext for a round, so withholding it for you would withhold it for the world, and the long-lived group share can never be deleted, so a future compromise opens the whole archive. CRT pays per switch, in fees and in operator trust, to get per-switch revocation and per-switch keys.</p></details>
+
+    <details><summary>Wasn’t this Sarcophagus? That shut down.</summary>
+      <p>The economics are close: bonded operators holding shards, paid to hold, releasing at a resurrection time unless the owner rewinds. Sarcophagus did not die of its cryptography; it died of thin demand and thin operator revenue. CRT does not pretend to have solved either. It changes the parts that were avoidable: no storage layer, a coordinator that cannot sign, cancellation as the primitive, and an operator network inherited from CSR rather than built from scratch.</p></details>
+
+    <details><summary>Who can decrypt my data before the deadline?</summary>
+      <p>Only a coalition of at least <i>t</i> of the <i>n</i> runners you chose, acting together, plus whoever holds your recovery file. Each runner holds one sealed share and knows nothing about the others. The app shows how concentrated your chosen set is by operator, network and country; choose wide.</p></details>
+
+    <details><summary>Who can decrypt after the deadline?</summary>
+      <p>Anyone holding the recovery file. The released keys are public on chain; the file — with the sealed shares and, for applications like dead-man-switch, the ciphertext — is the secret. Give it to the people who should read it, and treat it like the letter it is.</p></details>
+
+    <details><summary>What if I lose my wallet?</summary>
+      <p>You cannot renew or cancel. The switch will release at its deadline as configured. That is the designed behaviour of a dead man’s switch and the reason the app insists on the duration conversation up front. Owner locks may be multisigs or time-locked recovery schemes; CRT does not care which lock owns the Alive Cell.</p></details>
+
+    <details><summary>What if runners disappear?</summary>
+      <p>Every release needs only <i>t</i> of <i>n</i>. The app shows your remaining margin daily — separately for the threshold and for any mandatory branch — and rewrapping at renewal replaces lost runners with new keys. A lost mandatory node is fatal by design; that is what “mandatory” means, and the app makes you type it out for long terms.</p></details>
+
+    <details><summary>Can a runner release early?</summary>
+      <p>Not on chain: consensus refuses the transaction until the chain’s median time has passed the deadline plus 24 hours. Off chain, a runner could leak its key to someone; no protocol can prevent that, including ones with slashing, which only ever punished on-chain evidence. Thresholds and diversity are the defence.</p></details>
+
+    <details><summary>Can a runner refuse to release?</summary>
+      <p>Yes, at the cost of its future tips and its visible track record — its heartbeat history is on chain. Thresholds cover it: you need <i>t</i> honest runners out of <i>n</i>, not all of them.</p></details>
+
+    <details><summary>Is deletion on cancel verifiable?</summary>
+      <p>No. Nothing can prove a byte was erased. What CRT does: the host deletes keys itself, bound to the Alive Cell’s death, independent of the operator’s software; the key never existed anywhere but in encrypted storage marked secret; and a runner that copies keys is one runner of many. A runner dishonest from the first day is outside the threat model, and the documentation says so.</p></details>
+
+    <details><summary>What does it cost?</summary>
+      <p>Tips to the runners — about 183 CKB per runner and year with the defaults — plus the capacity parked in cells, which comes back. For eight runners and one year: roughly 1,500 CKB spent and 4,400 CKB parked, around $15 and $44 at one cent per CKB. Cancelling is free. The full table is in the specification, §11.</p></details>
+
+    <details><summary>Why Nervos CKB?</summary>
+      <p>Three things the design leans on are native there: cells with a unique, unrecreatable identity (type-id), transaction validity conditioned on chain time (<code>since</code> against the median of the last 37 blocks), and a cheap, general scripting VM in which a lock can check a key against a public key. And CSR, the operator network CRT runs on, exists only on CKB.</p></details>
+
+    <details><summary>When mainnet?</summary>
+      <p>CRT runs where CSR’s service runtime runs: testnet today. CSR opens mainnet for services behind a published gate (monitor history, number of ranked runners, concentration limits). CRT follows the same day, after its own testnet period.</p></details>
+
+    <details><summary>Where is the data stored?</summary>
+      <p>Nowhere by CRT. Your application decides. dead-man-switch puts the ciphertext inside the recovery file itself — a single HTML file you keep, print the certificate of, and hand to the people who should open it.</p></details>
+
+    <details><summary>Is it post-quantum secure?</summary>
+      <p>No. secp256k1 throughout, like the chain it runs on. The app warns at terms over five years, and rewrapping onto new runners with new keys is the migration path when the time comes.</p></details>
+  </article>
+</main>
+
+<footer>
+  <span>CRT — an open protocol on Nervos CKB. MIT.</span>
+  <a href="https://github.com/psawyerberlin/ckb-revocable-timelock/blob/main/SPEC.md">Specification</a>
+  <a href="https://github.com/ckb-service-runner/ckb-service-runner">CKB Service Runner</a>
+  <a href="https://csr-monitor.chainsolution.net">CSR network monitor</a>
+  <a href="https://dead-man-switch.chainsolution.net">dead-man-switch</a>
+</footer>
+</body>
+</html>

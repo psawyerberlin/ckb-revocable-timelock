@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://crt.chainsolution.net/sitemap.xml

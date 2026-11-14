@@ -1,0 +1,8 @@
+target/
+build/
+node_modules/
+dist/
+.devnet/
+*.log
+.DS_Store
+*:Zone.Identifier
