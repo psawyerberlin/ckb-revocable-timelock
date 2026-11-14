@@ -18,7 +18,7 @@ test('package layout and dependencies', () => {
   const deps = Object.keys(pkg.dependencies || {});
   for (const d of deps) assert.ok(['@noble/secp256k1', '@noble/hashes', '@ckb-ccc/core'].includes(d), `unexpected runtime dependency ${d}`);
   assert.ok(pkg.scripts && pkg.scripts.test, 'npm test script');
-  for (const m of ['hash', 'shamir', 'envelope', 'tree', 'cells', 'payload', 'canon']) assert.ok(exists('client', 'src', 'core', `${m}.ts`), `core/${m}.ts`);
+  for (const m of ['hash', 'shamir', 'envelope', 'tree', 'cells', 'payload', 'canon', 'cost']) assert.ok(exists('client', 'src', 'core', `${m}.ts`), `core/${m}.ts`);
   for (const m of ['rpc', 'deployment', 'runners', 'switch']) assert.ok(exists('client', 'src', 'chain', `${m}.ts`), `chain/${m}.ts`);
   for (const m of ['descriptor', 'kit', 'recover']) assert.ok(exists('client', 'src', 'kit', `${m}.ts`), `kit/${m}.ts`);
   assert.ok(exists('client', 'kit', 'template.html'));
@@ -42,6 +42,9 @@ test('constants of SPEC.md are present', () => {
   assert.match(s, /0x11b|0x1b\b|283/i); // GF(2^8) reduction
   assert.match(s, /ckb-default-hash/);
   assert.match(s, /545950455f4944/i);
+  assert.match(s, /estimateCost/);
+  assert.match(s, /validateSwitchParams/);
+  assert.match(s, /60_?000/); // HEARTBEAT upper bound
 });
 
 test('hard-fail verification has no override anywhere', () => {

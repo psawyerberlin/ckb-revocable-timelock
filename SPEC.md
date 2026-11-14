@@ -64,7 +64,8 @@ wallet; make any post-quantum claim. Applications (see `docs/developers.md`, and
 |---|---|---|
 | `PREFIX` | `CRT/v1` | Resolves O-7. The `TMN/v1` prefix of v0.1-draft is abandoned. |
 | `GRACE` | 86 400 s (24 h) | Resolves O-8. Protocol constant, in the lock script. |
-| `HEARTBEAT` | 8 000 blocks (≈ 1 day) | Default `Every(k)` interval of the heartbeat job. User-selectable per switch; the lock does not care. |
+| `HEARTBEAT` | per switch, default 8 000 blocks (≈ 1 day); allowed 1 000–60 000 (≈ 3 h – 1 week) | `Every(k)` interval of the heartbeat job. A **switch parameter** chosen at Create together with `n`, `t` and the mandatory set (§6.2). The lock does not care. |
+| `HEARTBEAT_TIP` | per switch, default 0.5 CKB; minimum 0.1 CKB | Tip per heartbeat run, also a switch parameter. Runners may refuse switches below their advertised minimum (§9). |
 | `network_id` | `0` mainnet, `1` testnet, `2` devnet | Same byte as `RegistryV3.network`. |
 | blake2b-256 | CKB default: 32-byte digest, personalization `ckb-default-hash` | Everywhere. |
 | Type ID script | `code_hash 0x00000000000000000000000000000000000000000000000000545950455f4944`, `hash_type type` | CKB's system type-id script. |
@@ -128,7 +129,7 @@ Standard CSR job cells (`ckb-service-runner/spec/job-cell-standard.md`), built w
 | | Keygen job | Heartbeat job |
 |---|---|---|
 | `csr-job-type.args` | service ID of **this runner's** CRT service (§5.1) | same |
-| `trigger` | `OnDemand` | `Every(HEARTBEAT)` |
+| `trigger` | `OnDemand` | `Every(HEARTBEAT)` — the switch's own interval |
 | `remaining_runs` | 1 | `ceil(term_blocks / HEARTBEAT)` |
 | `payload` | `"CRTS" ‖ 0x01 ‖ T` (37 bytes) | same |
 | `tip_shannons` | `KEYGEN_TIP` (default 1 CKB) | `HEARTBEAT_TIP` (default 0.5 CKB) |
@@ -342,6 +343,24 @@ armed_mandatory − j`. "Armed" = Node Cell in state 1 **and** the runner's last
 `3 × HEARTBEAT` blocks (read from the heartbeat job cell's recreation history or the runner's registry
 attestation). Overall headroom = minimum of the two.
 
+### 6.2 Switch parameters
+
+Everything the owner decides at Create, each with a default, all shown on one screen with the cost estimate
+(§11.1) updating live:
+
+| Parameter | Default | Range | What it trades |
+|---|---|---|---|
+| `deadline` / term | — | ≥ 1 day; warning > 5 years | duration risk (§10) |
+| `n`, `t` | 8, 5 | `n` 3–16, `1 ≤ t ≤ n`; warning `n < 5` | security vs cost: each runner costs its tips and its cells |
+| mandatory set `j`-of-`m` | none | any subset of the `n`; `1-of-1` on > 1 year needs typed acknowledgement | harder to steal vs easier to lose, one for one |
+| `HEARTBEAT` | 8 000 blocks | 1 000–60 000 | **detection delay vs cost**: a missing runner is noticed after ≈ 3 × `HEARTBEAT`; cost scales with `1 / HEARTBEAT` |
+| `HEARTBEAT_TIP` | 0.5 CKB | ≥ 0.1 CKB | runner willingness: higher tips get picked up by more runners |
+| `KEYGEN_TIP` | 1 CKB | ≥ 0.5 CKB | keygen latency |
+| organiser fee | app-defined | ≥ 0 | nothing; a bypassable output |
+
+Renew re-uses the switch's `HEARTBEAT` and `HEARTBEAT_TIP` unless the owner changes them (new heartbeat jobs
+carry the new values; old jobs run out). Rewrap may change everything but `T`.
+
 ---
 
 ## 7. Keys, envelopes and access trees (client side)
@@ -477,6 +496,8 @@ The client (or the coordinator) builds its candidate list from public data only:
   switches served (Node Cells with its `R`), median blocks from Create to Commit, heartbeat regularity. Every
   figure is recomputable from the chain.
 
+A runner may publish, in `deployments/<network>-runners.json`, a minimum `HEARTBEAT_TIP` and a maximum `HEARTBEAT` it accepts; the client filters candidates by the switch parameters.
+
 Selection defaults: only `stake.status == deposited` and `attestation.status == valid`; `check_type ==
 p2p_verified` preferred; at most one runner per declared country/ASN cell; new runners marked *unproven*, not
 penalised. Coalition risk (operator / ASN / country concentration of the chosen set) is shown before Create.
@@ -523,6 +544,31 @@ Reference at CKB = $0.01, defaults of §3.3, `HEARTBEAT` = 8 000 blocks ≈ 1 da
 | Spent: 8 × (1 + 183) + 50 + fees | ≈ **1 530** (≈ $15) |
 | Locked after commit (Alive + 8 × (244 + 295)) | ≈ **4 440** (≈ $44), refundable |
 | Locked during the first hours (+ 8 × 288) | ≈ 6 740 |
+
+### 11.1 Cost estimator (normative for clients and applications)
+
+Every client shows the owner an estimate **before** Create, Renew and Rewrap, computed from the switch
+parameters (§6.2) and the deployment's capacity constants — never a hard-coded table. With
+`runs = ceil(term_blocks / HEARTBEAT)` and `term_blocks = term_seconds / block_seconds` (`block_seconds` from
+the deployment file, 10 s on mainnet/testnet unless measured otherwise):
+
+```text
+per runner, over the term:   tips      = KEYGEN_TIP + runs × (HEARTBEAT_TIP + max_fee)
+spent now:                   organiser_fee + network_fees
+spent over the term:         n × tips                              (prepaid into the job cells, paid out per run)
+parked (refundable):         alive_cell + n × (node_cell + keygen_job_occupied + heartbeat_job_occupied)
+                             — keygen_job_occupied returns within hours; show it separately
+monthly running cost:        spent over the term / term_months
+detection delay:             3 × HEARTBEAT × block_seconds            (how long a silent runner goes unnoticed)
+```
+
+Capacity constants come from the cell layouts: `node_cell` = 8 + lock bytes + 139; job cells per CSR's
+`minJobCapacity` (occupied + `runs × (tip + max_fee)`); `alive_cell` = 8 + lock bytes + 4. The estimator returns
+every line in CKB and, when a fiat rate is supplied by the application, in fiat, and states the assumptions
+(`block_seconds`, lock sizes). The reference values of the table above are the estimator's output for the
+defaults and are checked by a test (`cost_estimate_defaults`).
+
+Unspent prepaid tips (cancel before the term ends) return to the owner with the job cells.
 
 A runner earns ≈ 183 CKB per switch-year; as in v0.1-draft, a launch-phase runner is a contribution, not income,
 and `docs/operators.md` says so first. CSR's own costs (10 000 CKB DAO stake, 700 CKB runner wallet) are the

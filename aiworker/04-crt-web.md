@@ -20,7 +20,7 @@ UI framework; keyboard-navigable; `prefers-color-scheme` respected.
 ## Phase 2 — create flow
 
 Screens, in order, each one a route: **Deadline** (date picker; plain-language duration risk per `SPEC.md` §10;
-the quantum disclaimer appears for > 5 years; `HEARTBEAT` choice daily/weekly with the cost difference shown) →
+the quantum disclaimer appears for > 5 years) →
 **Runners** (directory table from `runners.ts`: rank, availability, country/ASN cell, stake, "unproven" badge,
 switches served; coalition-risk summary of the current selection; "run your own runner" link to
 `docs/operators.md`; the user picks `n` and `t`, optionally marks mandatory runners; `1-of-1` mandatory on a term
@@ -47,7 +47,7 @@ otherwise the headroom shortfall.
 
 `web/test/` with `vitest` + `@testing-library/dom` (or Playwright if available offline; record the choice):
 screens render, Cancel reachable in ≤ 2 clicks from "My switches", mainnet disabled text, the quote matches
-`SPEC.md` §11 numbers for the 8-runner/1-year default (1 530 spent, 4 440 locked ± 2 %). Lighthouse-style checks
+`estimateCost` for the defaults (1 530 spent, 4 440 locked ± 2 %) and changes when the heartbeat slider moves (`web_cost_panel_live`). Lighthouse-style checks
 by script: no external requests in the built `site/app/` (grep `dist` for `https://` other than the configured
 RPC/monitor URLs). `docs/web.md`, `CHANGELOG.md`.
 

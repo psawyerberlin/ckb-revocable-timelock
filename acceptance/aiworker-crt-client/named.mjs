@@ -4,7 +4,7 @@ import { spawnSync } from 'node:child_process';
 const names = ['identity_vectors', 'descriptor_hash_vector', 'shamir_combine_vectors', 'shamir_roundtrip', 'envelope_roundtrip',
   'envelope_tamper_fails', 'tree_xor_threshold_roundtrip', 'headroom_separate', 'nodecell_roundtrip', 'verify_hard_fail_no_override',
   'build_cancel_has_no_typeid_output', 'build_create_layout', 'kit_deterministic', 'kit_self_contained', 'kit_under_400kb',
-  'recover_offline_roundtrip', 'csr_job_vendor_hash'];
+  'recover_offline_roundtrip', 'csr_job_vendor_hash', 'cost_estimate_defaults', 'cost_scales_with_heartbeat', 'switch_params_ranges'];
 
 const install = spawnSync('npm', ['ci', '--no-audit', '--no-fund'], { cwd: 'client', stdio: 'inherit' });
 if (install.status !== 0) { console.log('npm ci failed'); process.exit(1); }

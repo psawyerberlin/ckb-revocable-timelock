@@ -23,6 +23,8 @@ test('screens exist and cancel is a first-class action', () => {
   const src = walk('web/src').filter((f) => /\.(ts|html)$/.test(f)).map((f) => read(f)).join('\n');
   for (const s of [/deadline/i, /runner/i, /quote/i, /arm/i, /kit/i, /recover/i, /renew/i, /rewrap/i, /cancel/i, /reclaim/i, /headroom/i]) assert.match(src, s);
   assert.match(src, /I understand/);
+  assert.match(src, /estimateCost/);
+  assert.match(src, /heartbeat/i);
   assert.match(src, /quantum/i);
   assert.match(src, /testnet until/i);
   assert.match(src, /@crt\/client|\.\.\/client/);

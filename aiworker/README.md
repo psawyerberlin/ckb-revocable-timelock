@@ -13,3 +13,8 @@ Read `../AIWORKER.md` first. Run the specs in numeric order; each names its bran
 
 Each acceptance directory is run with `node --test acceptance/aiworker-<name>/` and, where present,
 `node acceptance/aiworker-<name>/named.mjs`, from the repository root.
+
+## Launch prompts
+
+`prompts/NN-<name>.md` is the self-contained text to start a worker run with (reading order, branch, phases,
+acceptance command, finish). Hand the worker that file.

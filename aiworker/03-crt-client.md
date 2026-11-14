@@ -21,6 +21,7 @@ its SHA-256 against `client/vendor/csr-job.sha256`, which the worker writes once
 | `tree.ts` | `AccessTree` types, `validateTree`, `leafPositions(tree)` (depth-first), `splitKey(K, tree, rng) → {leafSecrets[], commitments[]}`, `combineKey(tree, leafSecrets: Map<position, bytes>) → K`, `headroom(tree, armedPositions)` (threshold and mandatory, separately) | threshold, xor(threshold, threshold), reject unsupported shapes, headroom table |
 | `cells.ts` | `NodeCellData` encode/decode (139 bytes), `aliveCellData`, `isAliveCell(cell)`, `sinceAbsoluteTimestamp(seconds)` | round trips, rejects bad length/version |
 | `payload.ts` | `jobPayload(T)`, `parseResult(bytes)` | vectors |
+| `cost.ts` | `estimateCost({deployment, n, termSeconds, heartbeatBlocks, heartbeatTipShannons, keygenTipShannons, maxFeeShannons, organiserFeeShannons, fiatPerCkb?}) → {spentNow, spentOverTerm, parked, parkedTransient, monthly, detectionDelaySeconds, lines[], assumptions}` per `SPEC.md` §11.1; `SWITCH_PARAM_RANGES` of §6.2 and `validateSwitchParams` | `cost_estimate_defaults` (defaults → spent 1 530 ± 2 %, parked 4 440 ± 2 %), `cost_scales_with_heartbeat` (halving `HEARTBEAT` doubles the tip line), `switch_params_ranges` |
 | `canon.ts` | JCS (RFC 8785) for the JSON subset used here (no floats: all numbers are integers or strings) | RFC examples that fit the subset |
 
 `rng` is injectable everywhere (`(n) => Uint8Array`) so tests are deterministic; the default is
@@ -50,12 +51,12 @@ its SHA-256 against `client/vendor/csr-job.sha256`, which the worker writes once
 
 Each returns an unsigned `ccc.Transaction` the caller signs with any CCC signer (JoyID, Neuron via CCC, …):
 
-`buildCreate({signer, deployment, deadline, runners: {R, servicePubkey}[], heartbeatBlocks, termBlocks, tips,
-organiserFee?})` — Alive Cell (type-id args computed per CKB type-id rule from the first input and output index;
+`buildCreate({signer, deployment, deadline, runners: {R, servicePubkey}[], params: SwitchParams /* §6.2: heartbeatBlocks,
+heartbeatTip, keygenTip, maxFee, organiserFee */})` (validated with `validateSwitchParams`) — Alive Cell (type-id args computed per CKB type-id rule from the first input and output index;
 CCC has `ccc.hashTypeId` helpers — use them), `n` Node Cells (state 0), `n` keygen jobs, `n` heartbeat jobs
 (`jobCell`, `jobCellDeps` from `csr-job.mjs`), optional organiser fee output, change; `completeInputsByCapacity`,
 `completeFeeBy`. Returns also `{T, I, nodeCellIndices}`.
-`buildArm(T, descriptorHash)`, `buildRenew(T, newDeadline, heartbeatBlocks, extensionBlocks)`,
+`buildArm(T, descriptorHash)`, `buildRenew(T, newDeadline, params?)` (defaults to the switch's current heartbeat parameters read from its job cells),
 `buildRewrap(T, dropR[], addRunners[])` (destroys dropped Node Cells, creates new ones + jobs),
 `buildCancel(T, {reclaimNodeCells: true})` (Alive Cell input, **no** type-id output; Node Cells reclaimed; no fee
 output of any kind), `buildReclaim(T)` (Node Cells + expired job cells with `since = expiry_block`, `jobCellDeps`
@@ -106,4 +107,5 @@ Fixed test names (any runner; the `named.mjs` script looks for these strings in 
 `identity_vectors`, `descriptor_hash_vector`, `shamir_combine_vectors`, `shamir_roundtrip`, `envelope_roundtrip`,
 `envelope_tamper_fails`, `tree_xor_threshold_roundtrip`, `headroom_separate`, `nodecell_roundtrip`,
 `verify_hard_fail_no_override`, `build_cancel_has_no_typeid_output`, `build_create_layout`, `kit_deterministic`,
-`kit_self_contained`, `kit_under_400kb`, `recover_offline_roundtrip`, `csr_job_vendor_hash`.
+`kit_self_contained`, `kit_under_400kb`, `recover_offline_roundtrip`, `csr_job_vendor_hash`, `cost_estimate_defaults`, `cost_scales_with_heartbeat`,
+`switch_params_ranges`.
