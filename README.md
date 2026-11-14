@@ -50,7 +50,7 @@ what that changed, is in SPEC.md §1.2 and §16.
 | `spec/vectors/` | conformance vectors shared by the Rust and TypeScript test suites | done |
 | `aiworker/`, `AIWORKER.md` | build specs for the AI worker, phase by phase | done |
 | `acceptance/` | acceptance tests per spec (protected) | done |
-| `contracts/` | `crt-core` (shared `no_std` library) and `crt-node-lock` (the one CKB script) | spec 01 |
+| `contracts/` | `crt-core` (shared `no_std` library) and `crt-node-lock` (the one CKB script) | done (spec 01), see [`docs/contracts.md`](docs/contracts.md) |
 | `service/` | the CRT service that runs inside CSR | spec 02 |
 | `client/` | TypeScript library: access trees, envelopes, descriptor, kit, transaction builders, recovery | spec 03 |
 | `web/` → `site/app/` | reference web client | spec 04 |

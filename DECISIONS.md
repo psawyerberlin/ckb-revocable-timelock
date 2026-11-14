@@ -6,6 +6,11 @@ what was chosen and why. Protocol-changing decisions are also proposed as a `SPE
 
 ## Spec 01 — `crt-contracts` (`aiworker/01-crt-contracts.md`)
 
+### Phase 5 — documentation
+
+- 2026-11-15 — `docs/contracts.md` references SPEC §4.3 for the error table instead of copying it; cycles and data
+  hash taken from phase 3/4 measurements (hash re-verified against the current binary).
+
 ### Phase 4 — `crt-contract-tests`
 
 - 2026-11-15 — `ckb-testtool` 1.1.1 (CSR's version). Harness in `src/lib.rs`, the 24 named tests in
