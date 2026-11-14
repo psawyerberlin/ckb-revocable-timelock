@@ -5,8 +5,11 @@ edition = "2021"
 publish = false
 description = "CRT shared no_std library: Node Cell data, identity, payload, secp256k1 helpers (SPEC.md §2–3)"
 
-# Must never depend on ckb-std: used by the lock, the CSR service, the tests and host tools alike.
+# Must stay free of any CKB runtime crate (SDK or syscalls): used by the lock, the CSR service, the tests and host tools.
 [dependencies]
+blake2b-ref = { version = "0.3", default-features = false }
+k256 = { version = "0.13", default-features = false, features = ["arithmetic"] }
 
 [features]
 default = []
+alloc = []

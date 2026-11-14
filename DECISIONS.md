@@ -6,6 +6,16 @@ what was chosen and why. Protocol-changing decisions are also proposed as a `SPE
 
 ## Spec 01 — `crt-contracts` (`aiworker/01-crt-contracts.md`)
 
+### Phase 2 — `crt-core`
+
+- 2026-11-15 — `k256` 0.13 with only `arithmetic` (no ecdsa needed: only scalar → point); `blake2b-ref` 0.3 for
+  `ckb-default-hash`. `alloc` feature declared but unused (nothing allocates). Added `ckb_blake2b` helper.
+- `TYPE_ID_CODE_HASH` is `0x00…00545950455f4944` (right-aligned ASCII, CKB's real value).
+- `since_is_absolute_timestamp` requires the whole flags byte to equal `0x40` (reserved bits rejected).
+- `identity_vectors` parses the JSON by hand (no serde dependency) and also checks `job_payload` via `parse_payload`.
+- `CoreError` has `Data`, `Payload`, `Key`. Decoding is strict (length 139, version 1, state ≤ 2); pubkey/privkey
+  contents are not validated at decode time (the lock does it per state).
+
 ### Phase 1 — housekeeping, toolchain, workspace
 
 - 2026-11-15 — Housekeeping verified, nothing to repair: no `*:Zone.Identifier` files, no `crt-spec-repo.tar.gz`,
