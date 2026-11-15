@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="generator" content="CRT recovery kit %%KIT_VERSION%%">
+<title>CRT recovery kit %%SHORT_ID%%</title>
+<style>
+  :root { color-scheme: light; }
+  body { font-family: Georgia, "Times New Roman", serif; color: #000; background: #fff; max-width: 52rem; margin: 1.5rem auto; padding: 0 1rem; line-height: 1.45; }
+  h1 { font-size: 1.6rem; margin: 0 0 .3rem; }
+  h2 { font-size: 1.2rem; border-bottom: 1px solid #000; margin-top: 1.6rem; }
+  code, pre, textarea, .mono { font-family: "Courier New", Courier, monospace; font-size: .85rem; word-break: break-all; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { border: 1px solid #000; padding: .25rem .4rem; text-align: left; vertical-align: top; }
+  .banner { border: 3px solid #000; padding: .6rem .8rem; margin: 1rem 0; font-weight: bold; }
+  .banner.match { border-style: double; }
+  .banner.mismatch { border-style: dashed; background: #eee; }
+  .tree ul { margin: .2rem 0 .2rem 1.2rem; padding: 0; }
+  .tools textarea { width: 100%; box-sizing: border-box; }
+  .tools button { font: inherit; padding: .3rem .8rem; margin: .3rem .3rem .3rem 0; }
+  #crt-status { white-space: pre-wrap; border: 1px solid #000; padding: .5rem; min-height: 2rem; }
+  .noprint-note { font-style: italic; }
+  @media print {
+    body { max-width: none; margin: 0; font-size: 11pt; }
+    .tools, .noprint, #crt-application { display: none !important; }
+    h2 { page-break-after: avoid; }
+    table, .banner { page-break-inside: avoid; }
+    .certificate { page-break-after: always; }
+  }
+</style>
+</head>
+<body>
+<section class="certificate" id="crt-certificate">
+<h1>Recovery certificate — CKB Revocable Timelock</h1>
+<p>Kit version <code>%%KIT_VERSION%%</code>. Keep this file (and a printout of this page) somewhere safe.</p>
+
+<div id="crt-verify" class="banner">Self-verification runs when this file is opened in a browser with JavaScript.
+It shows MATCH when the embedded descriptor hashes to the value printed below, and MISMATCH when it does not
+(then do not trust this file).</div>
+
+%%CERTIFICATE%%
+</section>
+
+<section class="tools noprint">
+<h2>Recover the key</h2>
+<p class="noprint-note">Everything below runs inside this file. No part of it is loaded from the internet.</p>
+<h3>Online (reads the CKB blockchain)</h3>
+<p>CKB JSON-RPC addresses, one per line (edit if these no longer work):</p>
+<textarea id="crt-rpc-urls" rows="3" spellcheck="false">%%RPC_URLS%%</textarea>
+<p><button type="button" id="crt-btn-check">Check the switch</button>
+<button type="button" id="crt-btn-online">Recover from the chain</button></p>
+<h3>Offline (paste release values)</h3>
+<p>Paste one release value per line: the private key a runner published (64 hex digits), or
+<code>runner_lock_hash:private_key</code>, or the full data of a released Node Cell.</p>
+<textarea id="crt-paste" rows="6" spellcheck="false"></textarea>
+<p><button type="button" id="crt-btn-offline">Recover from pasted values</button></p>
+<h3>Result</h3>
+<pre id="crt-status">Nothing done yet.</pre>
+<p>Recovered key: <code id="crt-key">—</code></p>
+</section>
+
+<div id="crt-application"></div>
+
+<script type="application/json" id="crt-descriptor">%%DESCRIPTOR_JSON%%</script>
+<script type="application/json" id="crt-envelopes">%%ENVELOPES_JSON%%</script>
+<script type="application/json" id="crt-application-data">%%APPLICATION_JSON%%</script>
+<script id="crt-recovery" data-kit-version="%%KIT_VERSION%%">%%RECOVERY_JS%%</script>
+%%APPLICATION_SCRIPT%%
+</body>
+</html>

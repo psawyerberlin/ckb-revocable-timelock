@@ -2,8 +2,13 @@
 
 ## Unreleased
 
+aiworker/crt-client
+- `@crt/client` (`client/`): primitives, chain access, transaction builders, descriptor, recovery kit and recovery, and the
+  `crt` command line (`runners`, `plan`, `create`, `status`, `arm`, `renew`, `cancel`, `kit`, `recover`); `client/README.md`,
+  integration walkthrough in `docs/developers.md`.
 - `crt-service` (`service/`): CSR service with host bindings, mock host and the SPEC §5.3 state machine; `scripts/build-service.sh`,
   `crt-enable.sh`, `crt-disable.sh`, `devnet-service-smoke.sh` (written, not run); `docs/service.md`, filled `docs/operators.md`.
+main
 - `crt-node-lock` contract with `crt-core` and 24 contract tests; `docs/contracts.md` (layouts, paths, cycles, data hash).
 - `contracts/` Rust workspace (`crt-core`, `crt-node-lock`, `crt-contract-tests`), `rust-toolchain.toml`
   and `scripts/build-contracts.sh` (release build, size and data hash of `crt-node-lock`).

@@ -1,0 +1,5 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "noEmit": false, "rootDir": ".", "allowJs": true, "allowImportingTsExtensions": false, "rewriteRelativeImportExtensions": true },
+  "include": ["src", "vendor/*.mjs", "vendor/*.d.mts"]
+}

@@ -4,9 +4,164 @@ Newest spec first. One `##` section per spec, one bullet per decision: what was 
 what was chosen and why. Protocol-changing decisions are also proposed as a `SPEC.md` diff in the PR body
 (`AIWORKER.md` §5).
 
-## Spec 02 — `crt-service` (`aiworker/02-crt-service.md`)
+## Spec 03 — `crt-client` (`aiworker/03-crt-client.md`)
 
-### Phase 5 — documentation
+### Phase 5 — CLI and documentation
+
+- 2026-11-15 — **CLI runner.** `client/bin/crt.ts` runs through `tsx` (`npm run crt -- <command>`, `bin` entry in `package.json`);
+  no build step, same runner as the tests. Hand-written argument parser, no extra dependency.
+- 2026-11-15 — **Signing.** Without `--key` the CLI needs `--owner ADDRESS` and prints the unsigned transaction JSON
+  (CCC `Transaction.stringify`) for offline signing. `--key` signs and sends but is refused on `mainnet` and `testnet`.
+- 2026-11-15 — **`arm`** does verification (hard fail, no flag), builds descriptor and envelopes from a plan and a secret `K`
+  (generated unless `--secret`; stored only with `--secret-out`, mode 0600), writes `descriptor.json`/`envelopes.json` and
+  prints the Arm transaction. It wraps with `wrapKey` (not `wrapKeyAnchored`), because the Node Cells carry the hash only
+  after Arm is mined; the descriptor itself was verified against the chain.
+- 2026-11-15 — `plan` writes `{network, nodes, access_tree}` (single threshold tree, default t = ceil(5n/8)); more
+  elaborate trees are edited by hand in the plan file. `deployments/` is looked up in the cwd, then `../deployments`.
+- 2026-11-15 — Added `src/index.ts` as package entry (`main`); `core/hash.ts`'s `descriptorHash` (bytes) is not re-exported
+  there, the kit's `descriptorHash(descriptor)` (hex) is. CLI commands were checked by typecheck and `--help` only (no chain here).
+
+### Phase 4 — descriptor, kit and recovery
+
+- 2026-11-15 — **Deterministic splitting.** The share commitments are inside the descriptor whose hash goes on chain at
+  Arm, before anything is encrypted, yet the API is `wrapKey(K, descriptor, rng)`. So `buildDescriptor(plan, chain)` takes
+  `K` in the plan and the splitting randomness (XOR masks, Shamir coefficients) is a PRF of `K`:
+  `HMAC-SHA256(K, "CRT/v1/split" ‖ I ‖ u32 BE counter)` (`splitRng`, `deriveLeafSecrets`). `wrapKey` re-derives the
+  shares, refuses if they do not reproduce the descriptor's commitments ("K does not match"), and uses `rng` only for
+  ephemeral keys and nonces. Client-side only; other clients may split however they like (the commitments say what to expect).
+- 2026-11-15 — `buildDescriptor(plan, chain)` is pure: `chain = {T, deployment, aliveCell, nodeCells}` (the shapes returned
+  by `verifyNodes`/`readSwitch`); it requires exactly one state-1 Node Cell with a valid point per planned runner.
+  `buildVerifiedDescriptor(plan, T, ctx)` runs the SPEC §8.3 verification first; `wrapKeyAnchored(K, d, ctx)` refuses
+  unless verification passes and every Node Cell already carries `descriptorHash(d)` (SPEC §6 "no wrap to an unanchored
+  descriptor"). Both live in `kit/anchored.ts` so the kit bundle does not pull chain verification code.
+- 2026-11-15 — `validateDescriptor` mirrors `client/schema/descriptor.schema.json` (JSON Schema 2020-12, `additionalProperties:
+  false`, lowercase `0x` hex, integers only) plus semantic rules (identity = I(network_id, type_id), supported tree whose
+  leaves index `nodes`, one commitment per leaf, unique runners and Node Cells). Curve membership of `pubkey` is **not** a
+  schema/validation rule because the shared vector uses placeholder keys; `buildDescriptor` and `wrap` check it. Tests use
+  `ajv` 8 (devDependency only) to check the schema against the vector and the same mutations as `validateDescriptor`.
+- 2026-11-15 — Envelopes are `{position, node, runner_lock_hash, envelope: 0x hex}` (one per leaf, `aad = I ‖ u16 BE
+  position`); `unwrapAll` also accepts a plain hex array indexed by position. `unwrapAll(descriptor, envelopes, releases)`
+  returns `K` or throws `RecoveryError` whose message carries the headroom ("threshold headroom -1, mandatory headroom 0;
+  branch 0: 4 of 5 required …") and every bad leaf; `unwrapAllReport` returns the per-leaf report (`ok`, `no-release`,
+  `bad-privkey`, `missing-envelope`, `unwrap-failed`, `commitment-mismatch`) without throwing. Mandatory branch for the
+  headroom split = phase-1 default (smallest branch).
+- 2026-11-15 — `collectReleases(T, rpcUrls, {nodeLockCodeHash, fetch?})`: the third argument is needed because the lock code
+  hash is not derivable from `T`. Only **live** Node Cells in state 2 are read (no history scan in v0.1), and a release is
+  kept only if `pubkey(privkey)` equals the cell's pubkey. `recoverOffline(descriptor, envelopes, pasted[])` accepts bare
+  private keys (matched to nodes by pubkey), `R:privkey`, or raw state-2 Node Cell data; `recoverOnline` is the chain variant.
+- 2026-11-15 — Kit bundling: `scripts/build-kit.mjs` bundles `kit/recovery.ts` with **esbuild 0.28.2** (pinned devDependency,
+  the version `tsx` already ships; IIFE, minified, legal comments kept at the end) and writes `src/kit/assets.generated.ts`
+  (template + bundle as string constants, checked in) so `generateKit` needs no file access and works in browsers. Test
+  `kit_assets_up_to_date` rebuilds in memory and compares; `npm run build` regenerates first. Bundle ≈ 37 KB.
+- 2026-11-15 — `generateKit({descriptor, envelopes, application?, kitVersion, deadline?, rpcUrls?})`: `kitVersion` must equal
+  `KIT_VERSION` ("1"), so same version + same inputs ⇒ same bytes; embedded JSON has sorted keys (input key order does not
+  matter) and `<`/`>`/`&` escaped. The deadline is not in the descriptor (renewals move it), so it is an optional input
+  printed as "at kit generation". Pre-filled RPC list: `https://mainnet.ckb.dev/`, `https://testnet.ckb.dev/`,
+  `http://127.0.0.1:8114/` per network, editable in the page. `application.script` is inlined after the kit script
+  (rejected if it contains `</script`); `window.CRT_KIT = {version, descriptor, envelopes, application, api}`.
+- 2026-11-15 — A test runs the generated page's scripts in `node:vm` with a minimal DOM stub: banner MATCH (MISMATCH after
+  editing the embedded descriptor), `CRT_KIT.api.recover(pasted)` returns `K` and calls `crtApplication.onKey`. No browser
+  is available, so the real DOM wiring (buttons) is only type-checked.
+
+### Phase 3 — transaction builders
+
+- 2026-11-15 — `@ckb-ccc/core` 1.23 added as the third runtime dependency. All chain reads of the builders go through
+  `signer.client` (a `ccc.Client`), so one `{signer, deployment}` context suffices; tests mock it with
+  `ccc.ClientPublicTestnet.new({transport})` answering `get_cells`/`get_tip_header` from fixtures, and a
+  `ccc.SignerCkbPublicKey` (no private key). Every builder ends with `completeInputsByCapacity` + `completeFeeBy` and
+  makes sure at least one input carries the signer's lock (owner path of `crt-node-lock`, refund path of the job lock).
+- 2026-11-15 — Signatures: `buildCreate(args)` as written (returns `{tx, T, I, nodeCellIndices, keygenJobIndices,
+  organiserFeeIndex, ownerLockHash, params, warnings}`). The owner builders take the context as an extra **last**
+  argument: `buildArm(T, h, ctx)`, `buildRenew(T, newDeadline, params?, ctx)`, `buildRewrap(T, dropR, addRunners, ctx)`,
+  `buildCancel(T, opts?, ctx)`, `buildReclaim(T, ctx)`; `txBuilders(ctx)` returns them bound, with exactly the call
+  shapes of the spec (`buildArm(T, h)`, `buildRenew(T, d, params?)`, …).
+- 2026-11-15 — **Deviation from SPEC §6 / spec 03 (proposed SPEC change):** CSR's `csr-job-type` rejects more than one job
+  output per service group in a transaction (job-cell-standard §3, F-CON-007, error 9), and a runner's keygen and
+  heartbeat jobs have the same type script (service ID of that runner). Create therefore carries the `n` keygen jobs
+  only; the `n` heartbeat jobs are created by **Arm** (for every runner without a live heartbeat job for `T`, params
+  from `ctx.params`, else the switch's live heartbeat jobs, else the §6.2 defaults; `buildCreate` returns the validated
+  params to pass on). Nothing needs heartbeats before Arm (the switch is not usable yet), and walking away after Create
+  parks less capacity. Rewrap likewise creates keygen jobs for new runners; the next Arm adds their heartbeat jobs.
+- 2026-11-15 — **Reclaim is one job per transaction:** the CSR job lock accepts exactly one job input (error 7). `buildReclaim`
+  takes all Node Cells of `T` plus the expired job with the lowest `expiry_block` (`since` = expiry block, absolute
+  block form, flags 0; only jobs with `refund_lock_hash` = signer lock and `expiry_block ≤ tip`); call again for the next
+  job. Jobs are found per runner (`job_type` args = `crtServiceId(R)`, payload = `jobPayload(T)`); Rs come from the live
+  Node Cells plus `ctx.runners` (needed after a cancel that already destroyed the Node Cells). No registry dep.
+- 2026-11-15 — Heartbeat job term = `deadline + GRACE − now` (so the release run is covered); `remainingRuns =
+  ceil(term_blocks / HEARTBEAT)` with `term_blocks = term / block_seconds` (10.8 s default as in the cost estimator,
+  same epsilon); `expiry_block = tip + runs × HEARTBEAT + 7 days of blocks`; keygen `expiry_block = tip + 7 days`.
+  `max_cycles` 100 M. "now" is the tip header timestamp unless `ctx.now` is given. Job cells use exactly
+  `minJobCapacity` (`jobCell` of csr-job.mjs).
+- 2026-11-15 — Create: output 0 Alive Cell (owner lock, type-id, occupied capacity), outputs 1..n Node Cells (244 CKB with
+  a 64-byte-args data2 lock), then keygen jobs, then the organiser fee output (only if `organiserFee > 0`; needs
+  `organiserLock` and must cover the output's occupied capacity, else an error), then change. `T =
+  ccc.hashTypeId(inputs[0], 0)`: outputs are first laid out with `T = 0`, inputs collected, then rewritten with the real
+  `T` (sizes do not depend on `T`) before the fee is completed; a check asserts input 0 did not change. No node-lock
+  dep on Create (output locks do not run), job deps from `jobCellDeps`.
+- 2026-11-15 — Arm requires every Node Cell in state 1 and a common deadline; it does not call `verifyNodes` itself (the
+  caller verifies against the descriptor first, as SPEC §6 orders). Renew refuses a released switch and requires
+  heartbeat params (argument or live jobs). Rewrap keeps the deadline and leaves kept Node Cells untouched (their old
+  `descriptor_hash` is replaced by the next Arm). Cancel consumes the Alive Cell (+ Node Cells by default) and has only
+  the signer's change as output; a final assertion rejects any type-id output.
+
+Phase 2 — chain access
+
+- 2026-11-15 — `csr-job.mjs` and `csr-job.sha256` were already vendored in phase 1 (v0.1 tag header, hash verified unchanged);
+  not rewritten. A hand-written `vendor/csr-job.d.mts` gives TypeScript the types (outside the hashed file). The build
+  config now uses `rootDir: .` with `allowJs` so the vendored module is emitted next to `src/` (`dist/src/…`, `dist/vendor/…`).
+- 2026-11-15 — No `@ckb-ccc/core` in phase 2: the RPC layer uses plain JSON-RPC shapes (snake_case hex), `fetch` is injectable
+  (`FetchLike`) so tests run against a mock chain. Each URL is tried `1 + retries` times (retries = 1) before moving to the next.
+- 2026-11-15 — Deployment JSON: `csr.job_type`/`csr.job_lock` are `{code_hash, out_point}`; `csr.deployment` is the CSR JSON
+  accepted by `csr-job.mjs` `loadDeployment` and must agree with `csr.registry_type_hash`. A file with `enabled: false`
+  (mainnet today) is refused by `parseDeployment`. `loadDeployment(network)` reads `deployments/<network>.json` (Node only).
+- 2026-11-15 — `RegistryV3` is decoded strictly (total size, offsets, field lengths, version 3). The monitor exposes no
+  country/ASN today; `diversityKey` comes from the runner list (`country`, `asn`) or from the monitor if it adds them;
+  runners with an unknown key never collide. `selectRunners` ranks `p2p_verified` first, then monitor rank, then `R`;
+  mandatory runners are exempt from the deposited/valid filter, and runner-published `max_heartbeat_blocks` /
+  `min_heartbeat_tip_shannons` filter candidates.
+- 2026-11-15 — `readSwitch` counts "armed" as state 1; the heartbeat-freshness part of SPEC §6.1 needs job-cell history and is
+  injected as `heartbeatFresh(R)`. Headroom is computed only when a descriptor with `access_tree` is passed. States:
+  absent, cancelled, pending, committed, armed, released, inconsistent.
+- 2026-11-15 — `verifyNodes` checks rules in order across all nodes (first failing rule is reported). Additions beyond the
+  literal text, all failing closed: duplicate or ambiguous Node Cells, `type_id` ≠ T, recorded pubkey/`node_cell`/`alive_cell`
+  mismatches, and, once Node Cells carry a `descriptor_hash`, the descriptor must hash to it (rule 4). The function has
+  no option parameter; a test greps the sources for override-like tokens.
+
+Phase 1 — primitives
+
+- 2026-11-15 — Test runner: `node:test` through `tsx` (`tsx --test --test-reporter=tap`); TAP output is explicit so the
+  acceptance regex (`ok N - name`) matches regardless of the Node default reporter. No vitest.
+- 2026-11-15 — Runtime deps only `@noble/secp256k1` 2.x and `@noble/hashes` 1.x for now (`@ckb-ccc/core` is added in phase 3).
+  Sources import with `.ts` extensions; the build uses `rewriteRelativeImportExtensions`.
+- 2026-11-15 — `wrap`/`unwrap` are `async` (WebCrypto). Byte inputs are `Uint8Array`; hashes and cell fields that are
+  already hex in the descriptor/vectors are `0x` hex strings in `NodeCellData`; `identity`/`shareCommitment`/`jobPayload`
+  accept bytes or hex and return bytes.
+- 2026-11-15 — `client/test/kat-hkdf.json` generated from fixed `d = 01..20`, `e = a0..bf`; the key was re-derived
+  independently with Python `hmac` and matches.
+- 2026-11-15 — `vendor/csr-job.mjs` is CSR v0.6.1 (`dace9b7`) `sdk/js/csr-job.mjs` with one header comment line
+  prepended naming the tag; `csr-job.sha256` is the hash of that file as vendored.
+- 2026-11-15 — Cost estimator: SPEC §11.1 says `block_seconds` is 10 s by default, but its reference table (8 000 blocks
+  ≈ 1 day, 365 runs, ≈ 1 530 CKB) only holds at 86 400 / 8 000 = 10.8 s (at 10 s there would be 395 runs, ≈ 1 645 CKB,
+  outside the ±2 % of `cost_estimate_defaults`). Default is therefore `DEFAULT_BLOCK_SECONDS = 10.8`, overridable per
+  deployment (`deployment.blockSeconds`). `runs` subtracts 1e-9 before `ceil` to ignore float noise on exact multiples.
+  `spentOverTerm` includes organiser fee and network fees (the table's "Spent" row); `spentNow` is organiser + network fees.
+  Network fees default to 1 CKB in total. Job-cell occupied capacity is computed from the molecule `Job` layout
+  (heartbeat 165 data bytes → 303 CKB, keygen 153 → 291 CKB); node cell 244 CKB, alive cell 65 CKB (53-byte lock).
+- 2026-11-15 — Amounts are bigint shannons in, `number` CKB out. `validateSwitchParams(params, ctx?)` throws
+  `SwitchParamsError` (with `.errors`) and returns warnings (n < 5, term > 5 years). A 1-of-1 mandatory node on a term
+  > 1 year is an error unless `ctx.acknowledgedOneOfOne`. `SwitchParams` uses the names of §6.2 (`heartbeatBlocks`,
+  `heartbeatTip`, `keygenTip`, `maxFee`, `organiserFee`).
+- 2026-11-15 — Access trees: `threshold` and `xor` of ≥ 2 `threshold` branches; nesting and leaf-only branches rejected;
+  a node may not appear twice inside one threshold. `splitKey` shares the XOR branch secrets (last = K ⊕ others) with
+  Shamir; commitments are per leaf. `combineKey` uses the first `t` available shares per branch and does not check
+  commitments (callers do). `headroom` for `xor`: the mandatory branch is `opts.mandatoryBranch` or, by default, the
+  branch with the fewest leaves (last on ties); `threshold` headroom is the minimum over the other branches; a plain
+  threshold tree has `mandatory: null`.
+- 2026-11-15 — `parseResult` accepts `"CRT1" ‖ status` with or without the trailing 32-byte `T`.
+
+ Spec 02 — `crt-service` (`aiworker/02-crt-service.md`)
+
+Phase 5 — documentation
 
 - Cycle numbers in `docs/service.md` are stated as "not measured": the smoke script was never run. The state-machine
   diagram is a text summary; `machine.rs` stays authoritative on check order.
@@ -100,6 +255,8 @@ what was chosen and why. Protocol-changing decisions are also proposed as a `SPE
   `crt-service/mock`). Mock "random" bytes are a splitmix64 stream, overridable per call through `random_queue`
   (needed to test the scalar-out-of-range redraw); `kv_put_fail` injects quota errors. Off riscv64 the raw syscall
   returns `u64::MAX`.
+
+main
 
 ## Spec 01 — `crt-contracts` (`aiworker/01-crt-contracts.md`)
 
