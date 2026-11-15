@@ -1,0 +1,15 @@
+[workspace]
+members = ["crt-host", "crt-service"]
+resolver = "2"
+
+[workspace.dependencies]
+# Same pin as CSR's services/rust workspace.
+ckb-std = { version = "=1.1.0", default-features = false, features = ["allocator", "ckb-types", "dummy-atomic"] }
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+overflow-checks = true

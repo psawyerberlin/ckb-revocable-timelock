@@ -1,0 +1,9 @@
+[package]
+name = "crt-host"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[features]
+# In-memory `MockHost` for the state-machine tests (always available under `cfg(test)`).
+mock = []

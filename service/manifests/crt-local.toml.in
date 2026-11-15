@@ -1,0 +1,8 @@
+# Local CSR manifest of the CRT service (SPEC.md §5.1), rendered by scripts/crt-enable.sh: the runner lock hash
+# (service args), the ELF path and the 102-byte deployment data cell file (SPEC.md §5.5) are substituted in.
+# CSR's local manifest format has `data_cells` (file paths), so local mode uses the same data cell as on-chain.
+name = "crt"
+language = "rust"
+elf = "@ELF@"
+data_cells = ["@DATA@"]
+args = "@R@"
