@@ -8,8 +8,8 @@ starts from the branch the previous one pushed, so the pull requests stack: merg
 | 1 | `specs/crt-contracts.md` | `main` | `aiworker/crt-contracts` | `01-crt-contracts.md` |
 | 2 | `specs/crt-service.md` | `main` (after merging 1) | `aiworker/crt-service` | `02-crt-service.md` |
 | 3 | `specs/crt-client.md` | `main` (independent of 2) | `aiworker/crt-client` | `03-crt-client.md` |
-| 4 | `specs/crt-web.md` | `aiworker/crt-client` | `aiworker/crt-web` | `04-crt-web.md` |
-| 5 | `specs/crt-devnet-e2e.md` | `aiworker/crt-web` | `aiworker/crt-devnet-e2e` | `05-crt-devnet-e2e.md` |
+| 4 | `specs/crt-web.md` | `main` (after merging 2 and 3) | `aiworker/crt-web` | `04-crt-web.md` |
+| 5 | `specs/crt-devnet-e2e.md` | `main` (after merging 4) | `aiworker/crt-devnet-e2e` | `05-crt-devnet-e2e.md` |
 
 Before the first upload (once, on pswsl): add this repository and its deploy key to AIWorker's allow-list under the key name
 `ckb-revocable-timelock` (AIWorker guide, section 7a). If a project fails, fix the cause and re-queue it under a new project

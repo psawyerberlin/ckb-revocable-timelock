@@ -4,7 +4,7 @@ default_model: sonnet
 protected_paths: [acceptance/, SPEC.md, AIWORKER.md, aiworker/, spec/vectors/]
 source:
   repo: git@github.com:psawyerberlin/ckb-revocable-timelock.git
-  ref: aiworker/crt-client
+  ref: main
   key: ckb-revocable-timelock
 push:
   branch: aiworker/crt-web
