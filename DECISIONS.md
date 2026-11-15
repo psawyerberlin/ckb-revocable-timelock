@@ -6,6 +6,22 @@ what was chosen and why. Protocol-changing decisions are also proposed as a `SPE
 
 ## Spec 02 — `crt-service` (`aiworker/02-crt-service.md`)
 
+### Phase 3 — binary, manifest, enable script
+
+- 2026-11-15 — `main.rs` was already wired to `run()` in phase 2. `scripts/build-service.sh` mirrors
+  `build-contracts.sh` (`--locked`, stripped, `service/build/crt-service.elf`, prints `CRT_CODE_HASH`).
+- **Local manifests can name data cells.** CSR 0.6.1 `runtime/manifest.rs` accepts `data_cells = [paths]`, so
+  `crt-local.toml.in` uses the same data cell as the on-chain manifest (rendered from `deployments/<network>.json`
+  into a 102-byte file by `crt-enable.sh`); no second entry is needed. Placeholders: `@R@`, `@ELF@`, `@DATA@`.
+- **`R`** comes from `csr identity --json`, which in 0.6.x prints `runner_lock_hash` directly; no own hashing needed.
+  `--runner-lock-hash` overrides it (also used for `--dry-run` without a runner).
+- `csr service add-local` prints `{code_hash,name}`; `approve`/`enable` take that code hash (the ELF data hash, which
+  is the local registry key). The composite CRT service ID printed by the script is computed per
+  `spec/service-manifest.md` §4. Re-running is a no-op (CSR keeps the status of a known service).
+- The release asset is verified against `SHA256SUMS`; `--elf` skips the download. The dashboard URL printed is the
+  CSR default; the real bind is in `csr.toml`. The script and `crt-disable.sh` were only checked statically
+  (`bash -n`, `--dry-run`); nothing ran against a live CSR.
+
 ### Phase 2 — state machine
 
 - 2026-11-15 — `machine::step(host, &CrtDeployment) -> Outcome { status, skeleton: Option<Skeleton> }` in
