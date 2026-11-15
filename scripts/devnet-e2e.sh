@@ -142,7 +142,7 @@ TOML
     IDENT=$("$BIN" identity --json)
     LOCK_ARGS=$(printf '%s' "$IDENT" | json runner_lock_args)
     PUBKEY=$(printf '%s' "$IDENT" | json service_pubkey)
-    PEER=$(printf '%s' "$IDENT" | json peer_id)
+    PEER=$(printf '%s' "$IDENT" | json runner_id)   # 0.6.x calls the peer id "runner_id"
     "$CSR_DEV" --rpc "$RPC" --json fund --lock-args "$LOCK_ARGS" --ckb 1200 >/dev/null
     STAKE=$("$CSR_DEV" --rpc "$RPC" --json dao-deposit --ckb 10000)
     STAKE_OP="$(printf '%s' "$STAKE" | json tx_hash):$(printf '%s' "$STAKE" | json index)"
