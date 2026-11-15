@@ -1,0 +1,6 @@
+# Pinned for every cargo invocation in this repository (contracts/, later service/).
+# Stable channel; the on-chain scripts are cross-compiled for CKB-VM (RISC-V 64, IMAC).
+[toolchain]
+channel = "stable"
+targets = ["riscv64imac-unknown-none-elf"]
+components = ["rustfmt", "clippy"]

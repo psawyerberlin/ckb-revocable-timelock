@@ -1,0 +1,27 @@
+[workspace]
+members = [
+    "crt-core",
+    "crt-node-lock",
+    "crt-contract-tests",
+]
+# `crt-node-lock` is a `no_std`/`no_main` CKB script: it only builds for riscv64imac-unknown-none-elf
+# (scripts/build-contracts.sh). Host-side `cargo test` / `cargo clippy` at the workspace root therefore
+# cover the library and the test harness only.
+default-members = [
+    "crt-core",
+    "crt-contract-tests",
+]
+resolver = "2"
+
+[workspace.dependencies]
+# Same pin as CSR's contracts workspace, without `ckb-types`: the `bytes` crate it pulls in emits atomic
+# instructions that ckb-vm rejects, and the lock hand-parses its data (SPEC.md §4, aiworker/01 phase 3).
+ckb-std = { version = "=1.1.0", default-features = false, features = ["allocator", "dummy-atomic"] }
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+overflow-checks = true

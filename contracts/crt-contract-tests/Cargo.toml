@@ -1,0 +1,10 @@
+[package]
+name = "crt-contract-tests"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "ckb-testtool harness and transaction tests for crt-node-lock (phase 4)"
+
+[dependencies]
+crt-core = { path = "../crt-core" }
+ckb-testtool = "1.1.1"
