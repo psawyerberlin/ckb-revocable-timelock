@@ -5,6 +5,15 @@ what was chosen and why. Protocol-changing decisions are also proposed as a `SPE
 (`AIWORKER.md` §5).
 
 
+## Spec 05 (crt-devnet-e2e), Phase 4: manual devnet run (2026-11-15)
+
+- `scripts/devnet-scenario.mjs` ran end to end on a fresh devnet with 4 runners: ALL PASS, 8/8 steps
+  (precondition, create, commits + verify rule 1, arm + kit + wrap, renew, release after deadline + GRACE with key
+  recovery, cancel with deletions.log +1 per runner, rewrap with runner 3 dropped and runner 4 added).
+- Measured cycles: hold 444,915; keygen 4,985,680 (median 4,985,192); release 2,728,057 (median 2,727,813).
+  Create -> all commits 7.7 s. The 70M per-job limit leaves a margin of more than 10x.
+- The scenario needs four runners: dropping one of three would leave n=2, below the client minimum of 3.
+
 ## Spec 05 (crt-devnet-e2e), Phase 3: testnet deployment files
 
 - `scripts/deploy-testnet.sh`, `deployments/testnet-runners.json` (empty `runners` list with schema comment), `deployments/README.md` and `docs/testing.md` exist; nothing was run against a node.

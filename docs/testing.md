@@ -15,4 +15,12 @@ number of failed steps.
 
 ## Measured numbers
 
-Not yet measured: the scripts were written where no devnet is available. Run the scenario and paste the table here.
+Devnet run of 2026-11-15 (CSR v0.6.1, 4 runners, `bash scripts/devnet-e2e.sh --runners 4`): ALL PASS, 8/8 steps.
+
+| branch  | cycles |
+|---------|--------|
+| hold    | 444915 (max of 6, median 444915) |
+| keygen  | 4985680 (max of 3, median 4985192) |
+| release | 2728057 (max of 5, median 2727813) |
+
+Wall-clock Create -> all commits: 7.7 s. All branches are far below `limits.max_cycles_per_job` (70,000,000).
