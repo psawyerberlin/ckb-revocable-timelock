@@ -68,6 +68,8 @@ for f in "$CSR" "$CSR_DEV" "$ELF" "$NODE_LOCK"; do
   [ -e "$f" ] || { echo "missing $f (build it: cargo build / cargo build -p csr-dev in the CSR checkout, scripts/build-service.sh, scripts/build-contracts.sh)" >&2; exit 1; }
 done
 mkdir -p "$STATE"
+# the devnet funder (public test key of CSR's devtools) publishes the manifests: publisher binding = owner of the code cell
+python3 -I -c 'import json,sys; print(json.load(open(sys.argv[1]))["genesis"]["privkey"])' "$CSR_DIR/devtools/devnet-keys.json" > "$STATE/funder.key"; chmod 600 "$STATE/funder.key"
 
 # 1. devnet node (no-op when running) and CSR contracts
 $DEVNET start
@@ -156,10 +158,20 @@ TOML
     $DEVNET mine 3 >/dev/null
     touch "$RD/registered"
   fi
-  # CRT on this runner (idempotent). crt-enable.sh only knows testnet|mainnet as --network; the devnet data cell
-  # (SPEC.md 5.5, 102 bytes) is built here and passed with --data-cell, so the network name only picks defaults.
-  bash "$ROOT/scripts/crt-enable.sh" --network testnet --csr "$BIN" --workdir "$RD/crt" --elf "$ELF" \
-    --data-cell "$STATE/deployment-devnet.bin" >/dev/null
+  # CRT on this runner. CSR 0.6.1 keys a service by (code hash, args, data cells) only when it comes from an on-chain
+  # manifest (a local manifest registers the bare code hash, so the job cells of runner R would never match). The
+  # publisher of the code cell (the devnet funder) publishes one manifest per runner (args = R); the runner adds it.
+  if [ ! -f "$RD/crt-manifest.json" ]; then
+    R=$("$BIN" identity --json | json runner_lock_hash)
+    "$BIN" service publish --code-outpoint "$(json tx_hash < "$STATE/service-deploy.json"):0" \
+      --data-outpoint "$(json tx_hash < "$STATE/data-deploy.json"):0" --args "$R" \
+      --name crt --version 0.2.0 --language rust --min-csr 0.6.1 --description "CRT service of runner $i (devnet)" \
+      --key "$STATE/funder.key" > "$RD/crt-manifest.json.tmp"
+    mv "$RD/crt-manifest.json.tmp" "$RD/crt-manifest.json"
+    $DEVNET mine 4 >/dev/null
+  fi
+  "$BIN" service add-onchain --manifest "$(json manifest_outpoint < "$RD/crt-manifest.json")" --approve >/dev/null
+  "$BIN" service enable "$(json service_id < "$RD/crt-manifest.json")" >/dev/null
   # start the runner unless it runs
   if ! { [ -f "$RD/csr.pid" ] && kill -0 "$(cat "$RD/csr.pid")" 2>/dev/null; }; then
     nohup "$BIN" run >"$RD/csr.log" 2>&1 &
