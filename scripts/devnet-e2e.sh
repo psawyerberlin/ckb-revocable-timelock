@@ -6,6 +6,7 @@
 #
 # Usage: devnet-e2e.sh [--down] [--csr DIR] [--elf PATH] [--node-lock PATH] [--state DIR] [--runners N] [--help]
 #   --down           stop the runners and the devnet node (state under .devnet/ is kept)
+#   --reset          --down, then delete the devnet chain and all runner state (a fresh chain clock for the next run)
 #   --csr DIR        CSR checkout, built (csr, csr-dev) with `cargo build` (default .refs/csr, v0.6.1)
 #   --elf PATH       crt-service.elf (default service/build/crt-service.elf)
 #   --node-lock PATH crt-node-lock binary (default contracts/build/release/crt-node-lock)
@@ -19,7 +20,7 @@ set -euo pipefail
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 CSR_DIR="$ROOT/.refs/csr"; ELF="$ROOT/service/build/crt-service.elf"; NODE_LOCK="$ROOT/contracts/build/release/crt-node-lock"
-STATE="$ROOT/.devnet/e2e"; N=3; DOWN=0
+STATE="$ROOT/.devnet/e2e"; N=3; DOWN=0; RESET=0
 RPC=http://127.0.0.1:18114
 
 usage() { sed -n '2,/^set -euo/p' "$0" | sed '$d' | sed 's/^# \{0,1\}//'; }
@@ -27,6 +28,7 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --help|-h) usage; exit 0 ;;
     --down) DOWN=1 ;;
+    --reset) DOWN=1; RESET=1 ;;
     --csr) CSR_DIR="$2"; shift ;;
     --elf) ELF="$2"; shift ;;
     --node-lock) NODE_LOCK="$2"; shift ;;
@@ -54,6 +56,10 @@ stop_runner() { # dir
 if [ "$DOWN" = 1 ]; then
   for i in $(seq 1 "$N"); do stop_runner "$STATE/runner$i"; done
   [ -f "$CSR_DIR/scripts/devnet.sh" ] && $DEVNET stop || true
+  if [ "$RESET" = 1 ]; then
+    rm -rf "$CSR_DIR/.devnet" "$STATE" "$ROOT/deployments/devnet.json"
+    log "reset: chain, runner state and deployments/devnet.json deleted"
+  fi
   log "stopped"; exit 0
 fi
 

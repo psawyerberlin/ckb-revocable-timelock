@@ -16,6 +16,10 @@ bash scripts/devnet-e2e.sh --runners 3
 bash scripts/devnet-e2e.sh --down
 ```
 
+The scenario moves the chain clock forward (blocks with future timestamps) and refuses to start when the chain clock
+is not within 10 minutes of the wall clock, because the runners idle on a skewed chain. Before every rerun use a fresh
+devnet: `bash scripts/devnet-e2e.sh --reset && bash scripts/devnet-e2e.sh --runners 3`.
+
 Paste the PASS output into `DECISIONS.md` and the measured cycles into `docs/testing.md` and
 `client/src/tx/defaults.ts`.
 

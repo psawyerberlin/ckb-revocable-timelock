@@ -167,11 +167,9 @@ async function armSwitch(sw, K) {
 const state = {};
 
 // 0 ---------------------------------------------------------------------------------------------------------------
-await step('0 time travel: the node accepts a block 1 day ahead of its clock', async () => {
-  const before = await medianSeconds();
-  await advanceTo(before + 3600);
-  await mineAccel(25);
-  assert((await medianSeconds()) >= before + 3600, 'median did not move');
+await step('0 precondition: the chain clock is within 10 minutes of the wall clock (fresh devnet)', async () => {
+  const skew = Math.round((await tipMs()) / 1000 - Date.now() / 1000);
+  assert(Math.abs(skew) < 600, `chain clock is ${skew} s away from the wall clock: the runners idle on a skewed chain. Run: bash scripts/devnet-e2e.sh --reset && bash scripts/devnet-e2e.sh --runners 3`);
 });
 
 // 1 ---------------------------------------------------------------------------------------------------------------
@@ -225,7 +223,7 @@ await step('5 advance past deadline + GRACE; releases; collectReleases gives K',
   const rel = await waitFor('threshold releases', async () => {
     const r = await crt.collectReleases(T, opt.rpc, { nodeLockCodeHash: deployment.node_lock.code_hash });
     return r.size >= 2 ? r : null;
-  }, { timeoutS: 900, accel: 100 });
+  }, { timeoutS: 300, accel: 100 });
   const got = await crt.recoverOnline(state.descriptor, state.envelopes, opt.rpc);
   assert(Buffer.from(got).equals(Buffer.from(state.K)), `recovered K equals the wrapped K (${rel.size} releases)`);
   await sampleCycles();
@@ -239,7 +237,7 @@ await step('6 second switch: arm, cancel; deletions.log +1 per runner; no releas
   const before = runners.map((_, i) => deletionsLines(i + 1));
   await send(await crt.buildCancel(B.T, { reclaimNodeCells: false }, ctx));
   // the next heartbeat of every runner sees the consumed Alive Cell and deletes its key
-  await waitFor('deletions.log lines', async () => runners.every((_, i) => deletionsLines(i + 1) >= before[i] + 1), { timeoutS: 900, accel: 100 });
+  await waitFor('deletions.log lines', async () => runners.every((_, i) => deletionsLines(i + 1) >= before[i] + 1), { timeoutS: 300, accel: 100 });
   await advanceTo(B.deadline + GRACE + 60);
   await mineAccel(1100);
   const rel = await crt.collectReleases(B.T, opt.rpc, { nodeLockCodeHash: deployment.node_lock.code_hash });
@@ -252,7 +250,7 @@ await step('7 rewrap on a third switch: drop runner 3; runner 3 reports dropped'
   await waitFor('commits of C', committed(C.T));
   await armSwitch(C, crypto.getRandomValues(new Uint8Array(32)));
   await send(await crt.buildRewrap(C.T, [createRunners[2].R], [], ctx));
-  await waitFor('runner 3 dropped', async () => (await allRuns(3)).some((r) => r.status === 6), { timeoutS: 900, accel: 100 });
+  await waitFor('runner 3 dropped', async () => (await allRuns(3)).some((r) => r.status === 6), { timeoutS: 300, accel: 100 });
 });
 
 // ---- report -------------------------------------------------------------------------------------------------------
