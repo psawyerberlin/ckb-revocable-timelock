@@ -6,13 +6,22 @@ what was chosen and why. Protocol-changing decisions are also proposed as a `SPE
 
 ## Spec 04 — `crt-web` (`aiworker/04-crt-web.md`)
 
+### Phase 4 — quality and build
+
+- 2026-11-15 — Test runner: `vitest` with `jsdom` and `@testing-library/dom` (Playwright needs a browser download, unavailable offline). `vitest.config.ts` merges `vite.config.ts` so the `@crt/client` alias applies. `src/wallet.ts` is mocked in tests (no wallet or network).
+- 2026-11-15 — "Cancel reachable in ≤ 2 clicks" is tested as: Cancel (opens confirmation), then the confirm button exists and is `primary` like Create. The test does not click confirm (it would sign).
+- 2026-11-15 — The default quote test uses a one-year term, n = 8 defaults from `SWITCH_PARAM_RANGES`, and asserts the ±2 % bands both via `computeQuote` and via the rendered Quote screen after moving the heartbeat slider (`web_cost_panel_live`).
+- 2026-11-15 — `npm test` = `vitest run` followed by `scripts/check-external.mjs` (greps `dist/` for hosts outside the allowed list, same list as the acceptance test). It runs after `npm run build` in the acceptance runner.
+
+- 2026-11-15 — The CCC bundle contained hosts the app never contacts (second RPC mirror `*.ckbapp.dev`, `api.ckbccc.com` and `nervosnetwork.github.io` documentation links in error text, COTA aggregator), which failed the external-reference check. A post-build Vite plugin in `vite.config.ts` (`stripUnusedHosts`) drops the mirror from CCC's default URL list and points the doc links at github.com; the COTA aggregator (unused: no COTA calls) points at an inert path on the app's own host. The RPC used remains `*.ckb.dev`.
+
 ### Phase 3 — manage and recover
 
 - 2026-11-15 — Routes `#/switches` (My switches) and `#/recover`, linked from the header and the home page. The local list is `localStorage['crt.switches']` keyed by `T` (filtered by network); "Add by T" adds an entry without descriptor. The kit HTML (encrypted envelopes only, no secret) is also stored per `T` in `localStorage['crt.kits']` when the create flow builds it, so "Download kit again" and headroom (which needs the access tree from the descriptor) work later; a switch added by T only shows "headroom unknown".
 - 2026-11-15 — Countdown uses the chain median time (`get_blockchain_info.median_time`), not the local clock. "Last heartbeat age" = median time minus the block timestamp of the transaction that created each runner's live heartbeat job cell (it is recreated on every run); if unreadable it shows "unknown" and the runner counts as armed for headroom. A runner is stale when the age exceeds 3 × HEARTBEAT (SPEC §6.1), using the switch's recorded heartbeat blocks (default 8 000).
 - 2026-11-15 — Cancel: one click opens an inline confirmation, a second click signs. Both buttons use the `primary` style, the same size as Create; red fill. Cancel reclaims the Node Cells in the same transaction (`reclaimNodeCells: true`). Renew asks for a UTC date later than the current deadline and keeps the existing heartbeat parameters. Rewrap lists current runners (drop) and directory runners (add) and says a new Arm and kit follow. Reclaim builds one transaction per click (the job lock takes one job input per transaction).
 - 2026-11-15 — Recover needs no wallet: it uses the selected network's deployment, `collectReleases`, and with a loaded kit `unwrapAllReport` (per-leaf status table). With K: download as hex and "Hand K to the application slot" (`window.crtApplication.onKey`, reports when no slot exists). Without K: the headroom shortfall. With T only (no kit) it lists released runners and asks for the kit, since envelopes are not on chain. K is never rendered.
-- 2026-11-15 — Nothing here ran against a chain; checked by typecheck and build only. `npm test` is still the placeholder (vitest is phase 4).
+- 2026-11-15 — Nothing here ran against a chain; checked by typecheck and build only.
 
 ### Phase 2 — create flow
 
