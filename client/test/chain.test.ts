@@ -226,6 +226,15 @@ async function ruleOf(p: Promise<unknown>): Promise<number | null> {
   try { await p; return null; } catch (e) { if (e instanceof VerificationError) return e.rule; throw e; }
 }
 
+test('verify_after_arm_recorded_outpoint_is_dead', async () => {
+  // Arm replaces every Node Cell: the out point recorded in the descriptor is no longer live, the cell with the lock is
+  const w = world(3);
+  const p = plan(w);
+  p.nodes.forEach((n, i) => { n.node_cell = { tx_hash: h(0x10 + i), index: 7 }; });
+  const found = await verifyNodes(T, p, w);
+  assert.equal(found.length, 3);
+});
+
 test('verify_hard_fail_no_override', async () => {
   // rule 1: missing / wrong lock / wrong args
   { const w = world(3); w.chain.cells = w.chain.cells.filter((c) => c.out_point.tx_hash !== h(0xf1)); assert.equal(await ruleOf(verifyNodes(T, plan(w), w)), 1); }

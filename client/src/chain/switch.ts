@@ -170,7 +170,11 @@ export async function verifyNodes(T: string, descriptorOrPlan: DescriptorLike | 
       const l = c.output.lock;
       return lc(l.code_hash) === d.node_lock.code_hash && l.hash_type === 'data2' && lc(l.args) === lc(T) + R.slice(2);
     });
-    const pick = n.node_cell ? cands.filter((c) => cellKey(c.out_point) === cellKey(n.node_cell!)) : cands;
+    // `node_cell` records the cell at descriptor time. Arm replaces every Node Cell, so after Arm the recorded out
+    // point is dead; the unique live cell with this exact lock (args T ‖ R) is the Node Cell then, and rule 3 still
+    // checks its pubkey against the recorded one.
+    const recorded = n.node_cell ? cands.filter((c) => cellKey(c.out_point) === cellKey(n.node_cell!)) : [];
+    const pick = recorded.length === 1 ? recorded : cands;
     if (pick.length !== 1) throw new VerificationError(1, pick.length === 0 ? 'no live Node Cell with the expected lock and args' : 'more than one candidate Node Cell', R);
     const info = parseNode(pick[0]!);
     if (!info) throw new VerificationError(1, 'Node Cell data is not a valid NodeCellData', R);

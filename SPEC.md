@@ -470,7 +470,8 @@ Before building a descriptor or wrapping a key, the client verifies for each nod
 with no override of any kind** (no flag, no config key, no "continue anyway"):
 
 1. the Node Cell is live, its lock `code_hash` is the deployment's `node_lock_code_hash` with `hash_type data2`,
-   its args are `T ‖ R`;
+   its args are `T ‖ R`. The out point recorded in a descriptor is informational: Arm replaces every Node Cell, so
+   the unique live cell with this lock is the Node Cell and the recorded pubkey (rule 3) binds it;
 2. `R` is the runner lock hash of a live CSR registry cell (`RegistryV3`) with `network == network_id`; the
    registry's `service_pubkey` is the one recorded;
 3. the cell is in state 1 with a valid compressed pubkey;
