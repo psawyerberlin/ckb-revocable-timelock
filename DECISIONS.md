@@ -4,6 +4,22 @@ Newest spec first. One `##` section per spec, one bullet per decision: what was 
 what was chosen and why. Protocol-changing decisions are also proposed as a `SPEC.md` diff in the PR body
 (`AIWORKER.md` §5).
 
+## Spec 02 — `crt-service` (`aiworker/02-crt-service.md`)
+
+### Phase 1 — host bindings and mock host
+
+- 2026-11-15 — `service/` workspace with `crt-host` and `crt-service` (lib stub; the state machine follows in
+  phase 2). `ckb-std` pinned `=1.1.0` as in CSR's `services/rust`; `crt-host` itself needs no dependency: it uses
+  a raw `ecall` wrapper (CSR's `csr-svc` convention) for the service calls and for CKB `load_script` (2052) /
+  `load_cell_data` (2092, index 1, `Source::CellDep` = 3). No path dependency on the CSR checkout.
+- Wrappers return raw host codes; buffer-out calls return `(code, full_len)`. `load_script_args` reads the
+  `Script` into a 512-byte stack buffer, validates the molecule table layout by hand and copies the args; a
+  larger or malformed script gives code 12.
+- `trait Host` has `Syscalls` (real) and `MockHost` (`cfg(test)` or feature `mock`, forwarded as
+  `crt-service/mock`). Mock "random" bytes are a splitmix64 stream, overridable per call through `random_queue`
+  (needed to test the scalar-out-of-range redraw); `kv_put_fail` injects quota errors. Off riscv64 the raw syscall
+  returns `u64::MAX`.
+
 ## Spec 01 — `crt-contracts` (`aiworker/01-crt-contracts.md`)
 
 ### Phase 5 — documentation
