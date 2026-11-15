@@ -6,6 +6,29 @@ what was chosen and why. Protocol-changing decisions are also proposed as a `SPE
 
 ## Spec 03 — `crt-client` (`aiworker/03-crt-client.md`)
 
+### Phase 2 — chain access
+
+- 2026-11-15 — `csr-job.mjs` and `csr-job.sha256` were already vendored in phase 1 (v0.1 tag header, hash verified unchanged);
+  not rewritten. A hand-written `vendor/csr-job.d.mts` gives TypeScript the types (outside the hashed file). The build
+  config now uses `rootDir: .` with `allowJs` so the vendored module is emitted next to `src/` (`dist/src/…`, `dist/vendor/…`).
+- 2026-11-15 — No `@ckb-ccc/core` in phase 2: the RPC layer uses plain JSON-RPC shapes (snake_case hex), `fetch` is injectable
+  (`FetchLike`) so tests run against a mock chain. Each URL is tried `1 + retries` times (retries = 1) before moving to the next.
+- 2026-11-15 — Deployment JSON: `csr.job_type`/`csr.job_lock` are `{code_hash, out_point}`; `csr.deployment` is the CSR JSON
+  accepted by `csr-job.mjs` `loadDeployment` and must agree with `csr.registry_type_hash`. A file with `enabled: false`
+  (mainnet today) is refused by `parseDeployment`. `loadDeployment(network)` reads `deployments/<network>.json` (Node only).
+- 2026-11-15 — `RegistryV3` is decoded strictly (total size, offsets, field lengths, version 3). The monitor exposes no
+  country/ASN today; `diversityKey` comes from the runner list (`country`, `asn`) or from the monitor if it adds them;
+  runners with an unknown key never collide. `selectRunners` ranks `p2p_verified` first, then monitor rank, then `R`;
+  mandatory runners are exempt from the deposited/valid filter, and runner-published `max_heartbeat_blocks` /
+  `min_heartbeat_tip_shannons` filter candidates.
+- 2026-11-15 — `readSwitch` counts "armed" as state 1; the heartbeat-freshness part of SPEC §6.1 needs job-cell history and is
+  injected as `heartbeatFresh(R)`. Headroom is computed only when a descriptor with `access_tree` is passed. States:
+  absent, cancelled, pending, committed, armed, released, inconsistent.
+- 2026-11-15 — `verifyNodes` checks rules in order across all nodes (first failing rule is reported). Additions beyond the
+  literal text, all failing closed: duplicate or ambiguous Node Cells, `type_id` ≠ T, recorded pubkey/`node_cell`/`alive_cell`
+  mismatches, and, once Node Cells carry a `descriptor_hash`, the descriptor must hash to it (rule 4). The function has
+  no option parameter; a test greps the sources for override-like tokens.
+
 ### Phase 1 — primitives
 
 - 2026-11-15 — Test runner: `node:test` through `tsx` (`tsx --test --test-reporter=tap`); TAP output is explicit so the
