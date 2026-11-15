@@ -21,6 +21,21 @@ the threat model; that is why switches use several runners and thresholds.
 
 ## What you earn
 
+Cost table (`SPEC.md` §11; CKB = $0.01, `HEARTBEAT` = 8 000 blocks ≈ 1 day):
+
+| Item | Amount | Spent / locked |
+|---|---|---|
+| Keygen tip | 1 CKB per runner | spent |
+| Heartbeat tip | 0.5 CKB per runner per run → ≈ 183 CKB per runner-year | spent |
+| Organiser fee (optional) | default 50 CKB per Create, 0 per Cancel | spent |
+| Network fees | < 1 CKB per user transaction | spent |
+| Alive Cell | ≈ 61–130 CKB | locked, back on cancel |
+| Node Cell | 244 CKB per runner | locked, back on reclaim |
+| Keygen job cell | ≈ 288 CKB per runner | locked for hours, back at commit minus tip |
+| Heartbeat job cell | ≈ 295 CKB + 365 × 0.502 CKB per runner-year | locked, unspent part back at the end |
+
+The owner pays all of this; you only receive the tips.
+
 | | Default | Per switch-year |
 |---|---|---|
 | Keygen tip | 1 CKB | 1 CKB |
@@ -48,6 +63,17 @@ What it does (see `scripts/crt-enable.sh`; `--dry-run` shows without changing an
 4. `csr service add-local`, `approve`, `enable`;
 5. prints your **CRT service ID** and the dashboard link.
 
+Expected output (abridged; `--dry-run` prints the same steps prefixed `[dry-run]`):
+
+```text
+CRT service ID: 0x<64 hex>
+Runner lock hash R: 0x<64 hex>
+Check the Jobs page of your dashboard (http://127.0.0.1:8114 by default; see csr.toml [dashboard].bind) for CRT jobs.
+```
+
+Options: `--network testnet|mainnet` (required), `--dry-run`, `--runner-lock-hash 0x…` (override the value read from
+the running CSR). The script refuses to continue if the ELF's SHA-256 differs from the release's `SHA256SUMS`.
+
 Your service ID is derived from public data (`CRT_CODE_HASH`, your `R`, the deployment data hash), so you do not
 have to publish anything. To be listed in the client's runner directory, open a pull request adding your runner to
 `deployments/<network>-runners.json` (peer id, `R`, a label) — optional; clients can also find you by watching the
@@ -55,9 +81,22 @@ chain.
 
 ## Watch it
 
-The CSR dashboard's **Jobs** page shows every CRT run with a result `CRT1 <status> <T>`: `00` hold, `01` keygen,
-`02` recommit, `03` release, `04` done, `05` cancelled, `06` dropped, `07` **key lost** (storage problem — act), `08`
-bad args, `09` bad payload. `service_data/deletions.log` lists the keys CSR deleted on cancellation (never the
+The CSR dashboard's **Jobs** page shows every CRT run with a result `CRT1 <status> <T>`. Per status byte:
+
+| Byte | Meaning | What you do |
+|---|---|---|
+| `00` hold | deadline + 24 h not reached (or a transient race); no transaction | nothing |
+| `01` keygen | fresh key generated, stored, committed (public key in Node Cell) | nothing |
+| `02` recommit | key already stored; the commit transaction rebuilt with the same key | nothing |
+| `03` release | deadline + 24 h passed, key published | nothing |
+| `04` done | Node Cell already released; key deleted | nothing |
+| `05` cancelled | owner consumed the Alive Cell; key deleted | nothing |
+| `06` dropped | no Node Cell for you on chain; key deleted | nothing |
+| `07` **key lost** | committed Node Cell but no usable key in storage, or the key does not match the commitment; no transaction built | storage problem — investigate, tell the owner |
+| `08` bad args | service args are not a 32-byte runner lock hash | check the manifest |
+| `09` bad payload | job payload or chain answer malformed | ignore, report if repeated |
+
+See `docs/service.md` for the state machine. `service_data/deletions.log` lists the keys CSR deleted on cancellation (never the
 content).
 
 ## Disable

@@ -4,6 +4,103 @@ Newest spec first. One `##` section per spec, one bullet per decision: what was 
 what was chosen and why. Protocol-changing decisions are also proposed as a `SPEC.md` diff in the PR body
 (`AIWORKER.md` §5).
 
+## Spec 02 — `crt-service` (`aiworker/02-crt-service.md`)
+
+### Phase 5 — documentation
+
+- Cycle numbers in `docs/service.md` are stated as "not measured": the smoke script was never run. The state-machine
+  diagram is a text summary; `machine.rs` stays authoritative on check order.
+
+### Phase 4 — devnet smoke script (written, not run)
+
+- `scripts/devnet-service-smoke.sh` (`--help`, `bash -n` clean) and `scripts/devnet/crt-smoke.mjs` (plain JSON-RPC:
+  tip, mine-to, node-state, cell-live, send, owner-lock-hash) with `csr-job.mjs` copied from CSR v0.6.1. Nothing was
+  run: no devnet here; PASS output is not pasted (per task instructions).
+- **Switch creation is pluggable.** `client/` does not exist yet and hand-building the create transaction needs
+  signing details only checkable on a devnet, so the script takes `--create-switch CMD` (default
+  `client/scripts/devnet-create-switch.mjs` if present) that prints `<T> <deadline>` and supports `--consume-alive T`.
+  Wiring this up is part of the crt-devnet-e2e manual phase, as are the `csr-dev`/`csr` flags used (taken from CSR
+  docs/testing.md, unverified against a live build).
+- Clock advance: `mine-to` mines in batches via `devnet.sh mine` until the tip timestamp reaches
+  `deadline + GRACE + 60`; this needs a devnet that can mine with future timestamps, to be confirmed in the manual phase.
+
+### Phase 3 — binary, manifest, enable script
+
+- 2026-11-15 — `main.rs` was already wired to `run()` in phase 2. `scripts/build-service.sh` mirrors
+  `build-contracts.sh` (`--locked`, stripped, `service/build/crt-service.elf`, prints `CRT_CODE_HASH`).
+- **Local manifests can name data cells.** CSR 0.6.1 `runtime/manifest.rs` accepts `data_cells = [paths]`, so
+  `crt-local.toml.in` uses the same data cell as the on-chain manifest (rendered from `deployments/<network>.json`
+  into a 102-byte file by `crt-enable.sh`); no second entry is needed. Placeholders: `@R@`, `@ELF@`, `@DATA@`.
+- **`R`** comes from `csr identity --json`, which in 0.6.x prints `runner_lock_hash` directly; no own hashing needed.
+  `--runner-lock-hash` overrides it (also used for `--dry-run` without a runner).
+- `csr service add-local` prints `{code_hash,name}`; `approve`/`enable` take that code hash (the ELF data hash, which
+  is the local registry key). The composite CRT service ID printed by the script is computed per
+  `spec/service-manifest.md` §4. Re-running is a no-op (CSR keeps the status of a known service).
+- The release asset is verified against `SHA256SUMS`; `--elf` skips the download. The dashboard URL printed is the
+  CSR default; the real bind is in `csr.toml`. The script and `crt-disable.sh` were only checked statically
+  (`bash -n`, `--dry-run`); nothing ran against a live CSR.
+
+### Phase 2 — state machine
+
+- 2026-11-15 — `machine::step(host, &CrtDeployment) -> Outcome { status, skeleton: Option<Skeleton> }` in
+  `service/crt-service/src/machine.rs`; molecule encoding by hand in `src/tx.rs`; `CrtDeployment`, the result
+  bytes and `run()` (load data cell → `step`) in `src/lib.rs`. `crt-core` is a path dependency inside this
+  repository (`../../contracts/crt-core`). `ckb-types 1.1.4` (the version in `contracts/Cargo.lock`) is a
+  dev-dependency only, for `skeleton_molecule_decodes`.
+- **Deployment data cell is 102 bytes, not 97.** SPEC §5.5's field list (1 + 1 + 32 + 36 + 32) adds up to 102;
+  the "97 bytes" in its prose is an arithmetic slip. The field list wins (`DEPLOYMENT_LEN = 102`). Proposed SPEC
+  fix: "97 bytes" → "102 bytes".
+- "Empty skeleton" means `tx_skeleton_put` is never called (CSR `host-interface.md`: empty or never called = no
+  extra cells). The result is always written once, and it is always 37 bytes. When the payload does not parse,
+  `T` in the result is 32 zero bytes. `bad_args` is checked before `bad_payload` (SPEC §5.2 order), but `T` is
+  still taken from the payload if it is valid.
+- `main.rs` is built only for riscv64. On the host it is an empty `fn main` and `ckb-std` is a riscv64-only
+  dependency, so `cargo test` stays light. The `[[bin]]` has `test = false`. `run()` reports a missing or
+  malformed deployment data cell as `bad_args` (an installation error), with no skeleton. Phase 3 wires
+  `main.rs` to `run()`, which is already done.
+- **Node Cell lookup.** `cells_query` matches args by prefix, so each candidate's `CellOutput` is read and only
+  cells whose lock is *exactly* `crt-node-lock`/data2/`T ‖ R` count. Normally there is one candidate, which
+  costs two `chain_read`s (output + data), matching SPEC's HOLD cost. If no candidate qualifies, the result is
+  DROPPED. The recreated output is the input's `CellOutput` bytes, copied verbatim, so it has the same capacity
+  and lock.
+- **More than one Node Cell for `T ‖ R`.** In honest operation this does not happen: Create and Rewrap make one
+  Node Cell per runner, and the lock's node path allows exactly one output with the same lock (error 12). But
+  nothing stops a third party from creating a lookalike cell with the same lock and arbitrary data. Such a cell
+  can never be spent through the node path with a wrong key: release would fail with error 21, and the service
+  checks the key before it publishes anything. However, a state-0 lookalike with an early deadline would
+  otherwise be recommitted with our pubkey and then released early, on-chain and valid. Therefore index 0 is
+  used only if every qualifying candidate has byte-identical data; otherwise the status is `bad_payload`, with
+  no skeleton and nothing deleted. The residual risk is a griefing DoS on that runner (documented, not a leak).
+- A queried cell that `chain_read` reports dead (we lost a race with our own commit/release) gives `hold`:
+  nothing is deleted or written, and the next run sees the new state. Undecodable Node Cell data, a malformed
+  `cells_query` answer or an unexpected `kv_get` code all give `bad_payload` (inputs unusable; nothing written
+  or deleted).
+- `key_lost` also covers these cases: a stored entry that is not 32 bytes or not a valid scalar; a failed
+  `kv_put` (quota), where nothing is committed and the next run tries KEYGEN again; eight bad draws; and, at
+  RELEASE only, a stored key whose pubkey differs from the Node Cell's (it is never published). That check
+  needs a scalar multiplication, so HOLD skips it and stays cheap. The return codes of `kv_mark_secret`,
+  `delete_on_consume` and `tx_skeleton_put` are not acted on, because a run cannot do anything useful about
+  them.
+- RELEASE `since` is `0x40 ‖ (deadline + GRACE)`, not the current median time. A deadline whose
+  `deadline + GRACE` overflows or exceeds 56 bits stays in HOLD forever, because no `since` can express it.
+- Release build for riscv64 (`cargo build --release --target riscv64imac-unknown-none-elf`) succeeds: the
+  binary is about 71 208 bytes. Phase 3's build script will produce the definitive one.
+- Extra tests beyond the named ones: `keygen_redraws_out_of_range_scalar` and `lost_race_holds_and_keeps_key`.
+
+### Phase 1 — host bindings and mock host
+
+- 2026-11-15 — `service/` workspace with `crt-host` and `crt-service` (lib stub; the state machine follows in
+  phase 2). `ckb-std` pinned `=1.1.0` as in CSR's `services/rust`; `crt-host` itself needs no dependency: it uses
+  a raw `ecall` wrapper (CSR's `csr-svc` convention) for the service calls and for CKB `load_script` (2052) /
+  `load_cell_data` (2092, index 1, `Source::CellDep` = 3). No path dependency on the CSR checkout.
+- Wrappers return raw host codes; buffer-out calls return `(code, full_len)`. `load_script_args` reads the
+  `Script` into a 512-byte stack buffer, validates the molecule table layout by hand and copies the args; a
+  larger or malformed script gives code 12.
+- `trait Host` has `Syscalls` (real) and `MockHost` (`cfg(test)` or feature `mock`, forwarded as
+  `crt-service/mock`). Mock "random" bytes are a splitmix64 stream, overridable per call through `random_queue`
+  (needed to test the scalar-out-of-range redraw); `kv_put_fail` injects quota errors. Off riscv64 the raw syscall
+  returns `u64::MAX`.
+
 ## Spec 01 — `crt-contracts` (`aiworker/01-crt-contracts.md`)
 
 ### Phase 5 — documentation

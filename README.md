@@ -51,11 +51,11 @@ what that changed, is in SPEC.md §1.2 and §16.
 | `aiworker/`, `AIWORKER.md` | build specs for the AI worker, phase by phase | done |
 | `acceptance/` | acceptance tests per spec (protected) | done |
 | `contracts/` | `crt-core` (shared `no_std` library) and `crt-node-lock` (the one CKB script) | done (spec 01), see [`docs/contracts.md`](docs/contracts.md) |
-| `service/` | the CRT service that runs inside CSR | spec 02 |
+| `service/` | the CRT service that runs inside CSR (`crt-host`, `crt-service`), see [`docs/service.md`](docs/service.md) | done (spec 02) |
 | `client/` | TypeScript library: access trees, envelopes, descriptor, kit, transaction builders, recovery | spec 03 |
 | `web/` → `site/app/` | reference web client | spec 04 |
 | `site/` | the explainer website (deploy root of crt.chainsolution.net) | done |
-| `scripts/` | build, operator enable/disable, devnet end-to-end, testnet deployment | specs 02, 05 |
+| `scripts/` | build, operator enable/disable (see [`docs/operators.md`](docs/operators.md)), devnet smoke (not yet run), end-to-end, testnet deployment | spec 02 done, 05 |
 | `deployments/` | per-network code hashes and the public CRT runner list | spec 05 |
 | `coordinator/` | optional directory / mirror / unsigned-tx service | v0.2 |
 | `docs/` | operators, developers, contracts, service, testing, history | partly |
