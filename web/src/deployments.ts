@@ -17,7 +17,9 @@ export function getDeployment(network: NetworkName): Deployment {
 
 export function getRunnerList(network: NetworkName): CrtListEntry[] {
   const raw = byName(`${network}-runners`);
-  return Array.isArray(raw) ? (raw as CrtListEntry[]) : [];
+  if (Array.isArray(raw)) return raw as CrtListEntry[];
+  const list = (raw as { runners?: unknown } | undefined)?.runners;
+  return Array.isArray(list) ? (list as CrtListEntry[]) : [];
 }
 
 /** Optional organiser address of this build (`VITE_CRT_ORGANISER_ADDRESS`); the organiser fee needs one. */

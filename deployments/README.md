@@ -11,5 +11,5 @@ by pull request: `[{ "runner_lock_hash": "0x…", "peer_id": "Qm…", "label": "
 ## testnet.json / testnet-runners.json
 
 `testnet.json` is written by `scripts/deploy-testnet.sh` (see `docs/manual-steps.md`); `devnet.json` by
-`scripts/devnet-e2e.sh`. `testnet-runners.json` lists public runners as `{name, R, service_pubkey, dashboard?}`
-under `runners` (currently empty).
+`scripts/devnet-e2e.sh`. `testnet-runners.json` lists the public testnet runners that run CRT, in the array format
+above (one entry per runner with an on-chain manifest in `testnet-manifests/<R>.json`).
