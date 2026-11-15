@@ -164,7 +164,7 @@ authorisation; the owner can only hurt the owner.
 ### 4.2 Node path
 
 Otherwise, an input with `lock_hash == R` (the runner wallet cell of a CSR run transaction) must exist (error
-15), and exactly one output must have the same lock script as this input (error 12). Let `in` be this input's
+15), and exactly one output must have the same lock script as this input (error 12), and that output must have no type script (error 14: otherwise a runner could attach a script that makes the cell unspendable for the owner). Let `in` be this input's
 data and `out` the output's data, both valid `NodeCellData` (error 6). `out.capacity ≥ in.capacity` (error 13).
 `version`, `deadline`, `owner_lock_hash`, `descriptor_hash` unchanged (error 11). Then by state:
 
@@ -190,6 +190,7 @@ data mean anything — the type-id script already guarantees that only one cell 
 | 11 | node path changed `version`, `deadline`, `owner_lock_hash` or `descriptor_hash` |
 | 12 | node path: not exactly one output with this lock script |
 | 13 | node path: output capacity below input capacity |
+| 14 | node path: the output Node Cell has a type script |
 | 15 | node path: no input with lock hash `R` |
 | 20 | commit: pubkey rules violated |
 | 21 | release: `privkey` does not derive `pubkey` |

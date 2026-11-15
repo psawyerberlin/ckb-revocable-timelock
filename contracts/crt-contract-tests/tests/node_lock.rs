@@ -165,6 +165,26 @@ fn node_commit_two_outputs_rejected() {
 }
 
 #[test]
+fn node_commit_output_with_type_script_rejected() {
+    let (mut env, sw) = setup();
+    let node = env.node_cell(&sw, &enc(&sw.data(0)));
+    let lock = env.node_lock_script(&sw);
+    let wallet = env.runner_cell(&sw);
+    let tx = tx_with(
+        vec![input(&node, 0), input(&wallet, 0)],
+        vec![
+            (
+                output(NODE_CAPACITY, lock, Some(sw.runner_lock.clone())),
+                Bytes::copy_from_slice(&enc(&sw.data(1))),
+            ),
+            (output(999 * CKB, sw.runner_lock.clone(), None), Bytes::new()),
+        ],
+        vec![],
+    );
+    assert_script_error(env.verify(tx), 14);
+}
+
+#[test]
 fn node_commit_zero_pubkey_rejected() {
     let (mut env, sw) = setup();
     let mut d = sw.data(1);

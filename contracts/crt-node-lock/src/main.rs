@@ -8,7 +8,7 @@
 //! 3. owner path (§4.1): if, for every input of the group, some transaction input has
 //!    `lock_hash == owner_lock_hash` of that input's data, the script succeeds;
 //! 4. node path (§4.2): an input with `lock_hash == R` (15); exactly one output with this lock script and exactly
-//!    one input in the group (12); output data valid (6); capacity not lower (13); `version`, `deadline`,
+//!    one input in the group (12); the output has no type script (14); output data valid (6); capacity not lower (13); `version`, `deadline`,
 //!    `owner_lock_hash`, `descriptor_hash` unchanged (11); then commit 0 → 1 (20) or release 1 → 2
 //!    (21, then 8 / 22, then 23); any other transition 24.
 #![no_std]
@@ -32,6 +32,7 @@ const ERR_SINCE_FORM: i8 = 8;
 const ERR_CHANGED: i8 = 11;
 const ERR_OUTPUT_COUNT: i8 = 12;
 const ERR_CAPACITY: i8 = 13;
+const ERR_OUTPUT_TYPE: i8 = 14;
 const ERR_NO_RUNNER: i8 = 15;
 const ERR_COMMIT: i8 = 20;
 const ERR_PRIVKEY: i8 = 21;
@@ -184,6 +185,14 @@ fn run() -> Result<(), i8> {
         Some(i) if out_count == 1 && group_inputs == 1 => i,
         _ => return Err(ERR_OUTPUT_COUNT),
     };
+
+    // The Node Cell has no type script (SPEC §3.2): a runner must not attach one, or it could make the cell
+    // impossible for the owner to spend (error 14).
+    match syscalls::load_cell_by_field(&mut [0u8; 1], 0, out_index, Source::Output, CellField::Type) {
+        Err(SysError::ItemMissing) => {}
+        Ok(_) | Err(SysError::LengthNotEnough(_)) => return Err(ERR_OUTPUT_TYPE),
+        Err(e) => return Err(sys(e)),
+    }
 
     let old = load_node_data(0, Source::GroupInput)?;
     let new = load_node_data(out_index, Source::Output)?;
