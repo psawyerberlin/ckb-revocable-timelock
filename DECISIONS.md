@@ -4,6 +4,35 @@ Newest spec first. One `##` section per spec, one bullet per decision: what was 
 what was chosen and why. Protocol-changing decisions are also proposed as a `SPEC.md` diff in the PR body
 (`AIWORKER.md` §5).
 
+
+## Spec 05 (crt-devnet-e2e), Phase 3: testnet deployment files
+
+- `scripts/deploy-testnet.sh`, `deployments/testnet-runners.json` (empty `runners` list with schema comment), `deployments/README.md` and `docs/testing.md` exist; nothing was run against a node.
+- `deploy-testnet.sh` deploys `crt-node-lock` through `csr-dev deploy-service`; it refuses to overwrite `deployments/testnet.json` and `--dry-run` sends and writes nothing. The data cell and manifest are published by the devnet script path; confirm on the manual run.
+- `docs/manual-steps.md` now holds both manual procedures (devnet run, testnet deployment) with the expected cost (~20,000 CKB locked, recoverable).
+- Cycle defaults in `client/src/tx/defaults.ts` and the SPEC §5.4 proposal are left unchanged until real measurements exist.
+
+## Spec 05 (crt-devnet-e2e), Phase 2: scenario
+
+- `scripts/devnet-scenario.mjs` is written and only syntax-checked; no devnet was available, so there is no PASS output yet (to be pasted here after the manual run).
+- Time travel: mining with future timestamps through `scripts/devnet/crt-smoke.mjs mine-to`, until the node's median time passes `deadline + GRACE`.
+- Cycles are sampled from each runner's dashboard `/api/jobs` and `/api/jobs/{id}` and classified by result text (keygen / release / hold); field names must be confirmed on the first run.
+- The wrong-hash check uses a copy of the deployment with a bad `node_lock.code_hash`, so nothing needs restoring.
+- The script loads the TypeScript client directly; run it with `--experimental-strip-types`.
+- Phase 3 files (`deploy-testnet.sh`, `docs/manual-steps.md`, `docs/testing.md`, testnet deployment files) were added in minimal form because the acceptance tests check them; devnet cost figures are estimates.
+
+## Spec 05 (crt-devnet-e2e), Phase 1: devnet script
+
+- `scripts/devnet-e2e.sh` is written and only statically checked (`bash -n`, `--help`); no devnet was started.
+- The spec says `crt-enable.sh --csr-bin … --data-root …`; the existing script takes `--csr PATH` and `--workdir`.
+  Each runner gets a wrapper `.devnet/e2e/runnerN/csr` that pins `--data-root`/`--config`, passed as `--csr`.
+- `crt-enable.sh` only accepts `testnet|mainnet`; the devnet 102-byte data cell is built by the e2e script and
+  passed with `--data-cell`. `deployments/devnet.json` (written by the script) carries `node_lock`,
+  `network_id` 2 and the Type ID code hash.
+- Idempotence: markers/JSON files under `.devnet/e2e/`; runners are only started when their pidfile is dead.
+- Exact `csr-dev`/`csr` JSON field names (`runner_lock_args`, `peer_id`, `message`, `tx_hash`, `index`) follow CSR
+  docs/testing.md and must be confirmed on the first manual run.
+
 ## Spec 04 — `crt-web` (`aiworker/04-crt-web.md`)
 
 ### Phase 4 — quality and build

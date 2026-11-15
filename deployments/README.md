@@ -7,3 +7,9 @@ registry_type_script}`, `type_id_code_hash`, `rpc_urls[]`, `monitor_url`.
 
 `<network>-runners.json`: the public list of CSR runners that announced the CRT service (`SPEC.md` §9), maintained
 by pull request: `[{ "runner_lock_hash": "0x…", "peer_id": "Qm…", "label": "…", "since": "2026-11-14" }]`.
+
+## testnet.json / testnet-runners.json
+
+`testnet.json` is written by `scripts/deploy-testnet.sh` (see `docs/manual-steps.md`); `devnet.json` by
+`scripts/devnet-e2e.sh`. `testnet-runners.json` lists public runners as `{name, R, service_pubkey, dashboard?}`
+under `runners` (currently empty).
