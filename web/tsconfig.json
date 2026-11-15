@@ -1,0 +1,41 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "resolveJsonModule": true,
+    "lib": [
+      "ES2022",
+      "DOM"
+    ],
+    "allowImportingTsExtensions": true,
+    "types": [
+      "vite/client",
+      "node"
+    ],
+    "baseUrl": ".",
+    "paths": {
+      "@crt/client": [
+        "../client/src/index.ts"
+      ],
+      "@noble/hashes/*": [
+        "./node_modules/@noble/hashes/*"
+      ],
+      "@noble/secp256k1": [
+        "./node_modules/@noble/secp256k1"
+      ],
+      "@ckb-ccc/core": [
+        "./node_modules/@ckb-ccc/core"
+      ]
+    }
+  },
+  "include": [
+    "src",
+    "../client/src",
+    "../client/vendor"
+  ]
+}

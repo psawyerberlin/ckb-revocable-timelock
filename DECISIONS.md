@@ -4,6 +4,49 @@ Newest spec first. One `##` section per spec, one bullet per decision: what was 
 what was chosen and why. Protocol-changing decisions are also proposed as a `SPEC.md` diff in the PR body
 (`AIWORKER.md` §5).
 
+## Spec 04 — `crt-web` (`aiworker/04-crt-web.md`)
+
+### Phase 4 — quality and build
+
+- 2026-11-15 — Test runner: `vitest` with `jsdom` and `@testing-library/dom` (Playwright needs a browser download, unavailable offline). `vitest.config.ts` merges `vite.config.ts` so the `@crt/client` alias applies. `src/wallet.ts` is mocked in tests (no wallet or network).
+- 2026-11-15 — "Cancel reachable in ≤ 2 clicks" is tested as: Cancel (opens confirmation), then the confirm button exists and is `primary` like Create. The test does not click confirm (it would sign).
+- 2026-11-15 — The default quote test uses a one-year term, n = 8 defaults from `SWITCH_PARAM_RANGES`, and asserts the ±2 % bands both via `computeQuote` and via the rendered Quote screen after moving the heartbeat slider (`web_cost_panel_live`).
+- 2026-11-15 — `npm test` = `vitest run` followed by `scripts/check-external.mjs` (greps `dist/` for hosts outside the allowed list, same list as the acceptance test). It runs after `npm run build` in the acceptance runner.
+
+- 2026-11-15 — The CCC bundle contained hosts the app never contacts (second RPC mirror `*.ckbapp.dev`, `api.ckbccc.com` and `nervosnetwork.github.io` documentation links in error text, COTA aggregator), which failed the external-reference check. A post-build Vite plugin in `vite.config.ts` (`stripUnusedHosts`) drops the mirror from CCC's default URL list and points the doc links at github.com; the COTA aggregator (unused: no COTA calls) points at an inert path on the app's own host. The RPC used remains `*.ckb.dev`.
+
+### Phase 3 — manage and recover
+
+- 2026-11-15 — Routes `#/switches` (My switches) and `#/recover`, linked from the header and the home page. The local list is `localStorage['crt.switches']` keyed by `T` (filtered by network); "Add by T" adds an entry without descriptor. The kit HTML (encrypted envelopes only, no secret) is also stored per `T` in `localStorage['crt.kits']` when the create flow builds it, so "Download kit again" and headroom (which needs the access tree from the descriptor) work later; a switch added by T only shows "headroom unknown".
+- 2026-11-15 — Countdown uses the chain median time (`get_blockchain_info.median_time`), not the local clock. "Last heartbeat age" = median time minus the block timestamp of the transaction that created each runner's live heartbeat job cell (it is recreated on every run); if unreadable it shows "unknown" and the runner counts as armed for headroom. A runner is stale when the age exceeds 3 × HEARTBEAT (SPEC §6.1), using the switch's recorded heartbeat blocks (default 8 000).
+- 2026-11-15 — Cancel: one click opens an inline confirmation, a second click signs. Both buttons use the `primary` style, the same size as Create; red fill. Cancel reclaims the Node Cells in the same transaction (`reclaimNodeCells: true`). Renew asks for a UTC date later than the current deadline and keeps the existing heartbeat parameters. Rewrap lists current runners (drop) and directory runners (add) and says a new Arm and kit follow. Reclaim builds one transaction per click (the job lock takes one job input per transaction).
+- 2026-11-15 — Recover needs no wallet: it uses the selected network's deployment, `collectReleases`, and with a loaded kit `unwrapAllReport` (per-leaf status table). With K: download as hex and "Hand K to the application slot" (`window.crtApplication.onKey`, reports when no slot exists). Without K: the headroom shortfall. With T only (no kit) it lists released runners and asks for the kit, since envelopes are not on chain. K is never rendered.
+- 2026-11-15 — Nothing here ran against a chain; checked by typecheck and build only.
+
+### Phase 2 — create flow
+
+- 2026-11-15 — Routing is hash-based (`#/create/<step>`, steps deadline → runners → quote → create → arm → kit): the app is a static directory under `/app/`, so no server rewrite is needed. State lives in `src/draft.ts` (sessionStorage, amounts as shannon strings); the secret `K` is held in memory only and never stored. The kit (encrypted envelopes only) is kept in sessionStorage until "Finish".
+- 2026-11-15 — `@crt/client` is consumed from source (`../client/src`) through a Vite alias and a small plugin that resolves the client's bare imports (`@noble/*`, `@ckb-ccc/core`) from `web/node_modules`; `tsconfig.json` has matching `paths`. No package build of the client is needed.
+- 2026-11-15 — Deployment files are bundled with `import.meta.glob('../../deployments/*.json')`, so a missing `testnet.json` (none exists in the repository yet) does not break the build; the Runners screen then says that no deployment file exists.
+- 2026-11-15 — Mandatory runners: access tree `xor(threshold t-of-n over all runners, threshold j-of-m over the marked ones)`, the mandatory branch last (SPEC §7.3). `j` defaults to 1 and is editable when more than one runner is marked. "I understand" is required when exactly one runner is marked and the term exceeds 1 year (`SWITCH_PARAM_RANGES.oneOfOneMandatoryTermSeconds`).
+- 2026-11-15 — Suggested structure follows SPEC §10: 5-of-8 under a year, 6-of-12 above (n changes with the deadline; the user can edit both). "Pick for me" uses `selectRunners` with `requireDepositedValid: false`, because the monitor may be unreachable; the table shows monitor status either way.
+- 2026-11-15 — "Switches served" = Node Cells whose lock args end with the runner's `R`, counted from one prefix scan of the node lock; shown as "—" if the indexer query fails. Country/ASN comes from the client's `diversityKey`; "unknown" never counts as a collision.
+- 2026-11-15 — All switch parameters (heartbeat slider, tips, max fee, organiser fee) live on the Quote screen so the estimate updates live, as SPEC §6.2 asks. The quote is always `estimateCost`; for the defaults it gives 1 524.84 spent / 4 441 locked (SPEC table: ≈1 530 / ≈4 440).
+- 2026-11-15 — Organiser fee: default 50 CKB per SPEC, shown as its own line, editable to 0 (button). The organiser address is app-defined and none is configured in this repository: it is read from `VITE_CRT_ORGANISER_ADDRESS` at build time. Without it, Create refuses a non-zero fee with a message telling the owner to set it to 0 (no invented address).
+- 2026-11-15 — Create waits for commits by polling `readSwitch` every 6 s and listing each runner (unconfirmed / waiting / committed). Arm is enabled only when all runners are in state ≥ 1. The switch is also added to the local `crt.switches` list (key `T`) for phase 3.
+- 2026-11-15 — Arm: `buildVerifiedDescriptor` (hard fail) runs first; a `VerificationError` becomes a "MISMATCH (rule N)" block with the rule number and no button to continue. The owner may paste their own 32-byte secret or let the app generate one (shown once, hex). The kit is built (`wrapKey`; the anchored variant needs the Arm already mined) before Arm is signed, so a failed kit never leaves an armed switch without one.
+- 2026-11-15 — Kit: file name `crt-kit-<first 8 hex of T>.html`; "Finish" stays disabled until "I have saved the kit" is ticked, and a `beforeunload` warning is active until then. "Mirror to coordinator" is a disabled, unchecked switch. Nothing here was run against a chain (none available); the flow is typechecked, built and its pure parts (quote, risk, coalition, tree) checked by script.
+- 2026-11-15 — `npm test` is still the phase-1 placeholder; the vitest suite is phase 4.
+
+### Phase 1 — shell and wallet
+
+- 2026-11-15 — `web/` is a Vite + TypeScript project (no UI framework), `base: '/app/'`, `npm run build` = typecheck, `vite build`, then `scripts/copy-to-site.mjs` replaces `site/app/` with `web/dist/`.
+- 2026-11-15 — Styles: `web/src/style.css` `@import`s `site/assets/site.css` (bundled into the build); dark mode comes from its `prefers-color-scheme` rules.
+- 2026-11-15 — Mainnet option is disabled and the text "CRT is on testnet until CSR's service runtime opens on mainnet" shown while `deployments/mainnet.json` has `"enabled": false` (JSON imported at build time).
+- 2026-11-15 — Wallets: `@ckb-ccc/joy-id` first, then EIP-6963 browser wallets via `@ckb-ccc/eip6963`; the full `@ckb-ccc/ccc` bundle (with its UI) is avoided. Address from `getRecommendedAddress`, balance from `getBalance`.
+- 2026-11-15 — `@crt/client` is not imported yet (nothing in phase 1 needs it); it is wired in with phase 2.
+- 2026-11-15 — Known for phase 4: the CCC bundle contains URLs for `api.ckbccc.com`, `cota.nervina.dev`, `*.ckbapp.dev`; the no-external-requests check must allow-list or strip them.
+
 ## Spec 03 — `crt-client` (`aiworker/03-crt-client.md`)
 
 ### Phase 5 — CLI and documentation

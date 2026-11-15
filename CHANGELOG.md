@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- `crt-web` (`web/`), phases 1–4: Vite app at `/app/` with network switch and CCC wallet; create flow Deadline → Runners → Quote →
+  Create → Arm → Kit (duration risk, runner directory and coalition summary, live cost quote, hard-fail verification, kit download); My switches and Recover; vitest suite, external-reference check, `docs/web.md`.
+
 - `@crt/client` (`client/`): primitives, chain access, transaction builders, descriptor, recovery kit and recovery, and the
   `crt` command line (`runners`, `plan`, `create`, `status`, `arm`, `renew`, `cancel`, `kit`, `recover`); `client/README.md`,
   integration walkthrough in `docs/developers.md`.
