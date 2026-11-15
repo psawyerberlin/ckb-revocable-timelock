@@ -139,6 +139,11 @@ export function jobOutput(d: Deployment, R: string, job: CrtJob): { cellOutput: 
 export interface LiveNodeCell { cell: ccc.Cell; R: string; data: NodeCellData }
 export interface LiveJobCell { cell: ccc.Cell; R: string; job: CrtJob }
 
+/**
+ * All chain lookups use `findCellsOnChain`: CCC's `findCells` merges its local cache first, which still holds the
+ * outputs of this signer's own earlier transactions after the runners spent them (devnet run: Arm saw the state-0
+ * Node Cells of Create next to the committed ones).
+ */
 async function collect(gen: AsyncGenerator<ccc.Cell>): Promise<ccc.Cell[]> {
   const out: ccc.Cell[] = [];
   for await (const c of gen) out.push(c);
@@ -148,7 +153,7 @@ async function collect(gen: AsyncGenerator<ccc.Cell>): Promise<ccc.Cell[]> {
 /** Live Node Cells of switch `T` (lock = crt-node-lock data2, args prefix T); malformed cells are skipped. */
 export async function liveNodeCells(T: string, ctx: TxContext): Promise<LiveNodeCell[]> {
   const d = ctx.deployment;
-  const cells = await collect(ctx.signer.client.findCells({
+  const cells = await collect(ctx.signer.client.findCellsOnChain({
     script: { codeHash: d.node_lock.code_hash, hashType: 'data2', args: T }, scriptType: 'lock', scriptSearchMode: 'prefix', withData: true,
   }));
   const out: LiveNodeCell[] = [];
@@ -162,7 +167,7 @@ export async function liveNodeCells(T: string, ctx: TxContext): Promise<LiveNode
 
 /** The live Alive Cell of `T` (type-id args T, data "CRT" 01), or undefined. */
 export async function liveAliveCell(T: string, ctx: TxContext): Promise<ccc.Cell | undefined> {
-  const cells = await collect(ctx.signer.client.findCells({
+  const cells = await collect(ctx.signer.client.findCellsOnChain({
     script: typeIdScript(T), scriptType: 'type', scriptSearchMode: 'exact', withData: true,
   }));
   const alive = cells.filter((c) => c.cellOutput.type && c.cellOutput.type.eq(typeIdScript(T)) && lc(c.outputData) === '0x43525401');
@@ -177,7 +182,7 @@ export async function liveJobCells(T: string, Rs: string[], ctx: TxContext): Pro
   const out: LiveJobCell[] = [];
   for (const R of [...new Set(Rs.map(lc))]) {
     const type = { codeHash: d.csr.job_type.code_hash, hashType: 'data2' as const, args: crtServiceId(d, R) };
-    const cells = await collect(ctx.signer.client.findCells({ script: type, scriptType: 'type', scriptSearchMode: 'exact', withData: true }));
+    const cells = await collect(ctx.signer.client.findCellsOnChain({ script: type, scriptType: 'type', scriptSearchMode: 'exact', withData: true }));
     for (const cell of cells) {
       if (lc(cell.cellOutput.lock.codeHash) !== d.csr.job_lock.code_hash) continue;
       let job: CrtJob;
