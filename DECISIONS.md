@@ -5,6 +5,15 @@ what was chosen and why. Protocol-changing decisions are also proposed as a `SPE
 (`AIWORKER.md` §5).
 
 
+## Spec 05 (crt-devnet-e2e), Phase 2: scenario
+
+- `scripts/devnet-scenario.mjs` is written and only syntax-checked; no devnet was available, so there is no PASS output yet (to be pasted here after the manual run).
+- Time travel: mining with future timestamps through `scripts/devnet/crt-smoke.mjs mine-to`, until the node's median time passes `deadline + GRACE`.
+- Cycles are sampled from each runner's dashboard `/api/jobs` and `/api/jobs/{id}` and classified by result text (keygen / release / hold); field names must be confirmed on the first run.
+- The wrong-hash check uses a copy of the deployment with a bad `node_lock.code_hash`, so nothing needs restoring.
+- The script loads the TypeScript client directly; run it with `--experimental-strip-types`.
+- Phase 3 files (`deploy-testnet.sh`, `docs/manual-steps.md`, `docs/testing.md`, testnet deployment files) were added in minimal form because the acceptance tests check them; devnet cost figures are estimates.
+
 ## Spec 05 (crt-devnet-e2e), Phase 1: devnet script
 
 - `scripts/devnet-e2e.sh` is written and only statically checked (`bash -n`, `--help`); no devnet was started.

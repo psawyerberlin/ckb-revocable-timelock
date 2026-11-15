@@ -1,0 +1,4 @@
+{
+  "$comment": "Public testnet runners offering CRT. Each entry: {\"name\": str, \"R\": 32-byte hex runner lock hash, \"service_pubkey\": 33-byte hex compressed key, \"dashboard\": optional URL}.",
+  "runners": []
+}
