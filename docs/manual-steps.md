@@ -8,7 +8,7 @@ with a CKB node binary, Docker-free, with Rust, Node 22 and Python 3.
 ```sh
 . "$HOME/.cargo/env"
 [ -d .refs/csr ] || git clone --depth 1 --branch v0.6.1 https://github.com/ckb-service-runner/ckb-service-runner .refs/csr
-(cd .refs/csr && cargo build -p csr -p csr-dev)
+(cd .refs/csr && cargo build -p csr -p csr-dev && bash scripts/build-contracts.sh)
 bash scripts/build-contracts.sh
 bash scripts/build-service.sh
 bash scripts/devnet-e2e.sh --runners 3

@@ -65,6 +65,7 @@ mkdir -p "$STATE"
 
 # 1. devnet node (no-op when running) and CSR contracts
 $DEVNET start
+[ -f "$CSR_DIR/contracts/build/release/csr-config-type" ] || (cd "$CSR_DIR" && bash scripts/build-contracts.sh)   # CSR's own contracts
 if [ ! -f "$STATE/csr-contracts.done" ] || [ ! -f "$CSR_DIR/deployments/devnet.json" ]; then
   (cd "$CSR_DIR" && "$CSR_DEV" deploy-contracts >/dev/null)
   touch "$STATE/csr-contracts.done"
