@@ -6,6 +6,53 @@ what was chosen and why. Protocol-changing decisions are also proposed as a `SPE
 
 ## Spec 02 — `crt-service` (`aiworker/02-crt-service.md`)
 
+### Phase 2 — state machine
+
+- 2026-11-15 — `machine::step(host, &CrtDeployment) -> Outcome { status, skeleton: Option<Skeleton> }` in
+  `service/crt-service/src/machine.rs`; molecule encoding by hand in `src/tx.rs`; `CrtDeployment`, the result
+  bytes and `run()` (load data cell → `step`) in `src/lib.rs`. `crt-core` is a path dependency inside this
+  repository (`../../contracts/crt-core`). `ckb-types 1.1.4` (the version in `contracts/Cargo.lock`) is a
+  dev-dependency only, for `skeleton_molecule_decodes`.
+- **Deployment data cell is 102 bytes, not 97.** SPEC §5.5's field list (1 + 1 + 32 + 36 + 32) adds up to 102;
+  the "97 bytes" in its prose is an arithmetic slip. The field list wins (`DEPLOYMENT_LEN = 102`). Proposed SPEC
+  fix: "97 bytes" → "102 bytes".
+- "Empty skeleton" means `tx_skeleton_put` is never called (CSR `host-interface.md`: empty or never called = no
+  extra cells). The result is always written once, and it is always 37 bytes. When the payload does not parse,
+  `T` in the result is 32 zero bytes. `bad_args` is checked before `bad_payload` (SPEC §5.2 order), but `T` is
+  still taken from the payload if it is valid.
+- `main.rs` is built only for riscv64. On the host it is an empty `fn main` and `ckb-std` is a riscv64-only
+  dependency, so `cargo test` stays light. The `[[bin]]` has `test = false`. `run()` reports a missing or
+  malformed deployment data cell as `bad_args` (an installation error), with no skeleton. Phase 3 wires
+  `main.rs` to `run()`, which is already done.
+- **Node Cell lookup.** `cells_query` matches args by prefix, so each candidate's `CellOutput` is read and only
+  cells whose lock is *exactly* `crt-node-lock`/data2/`T ‖ R` count. Normally there is one candidate, which
+  costs two `chain_read`s (output + data), matching SPEC's HOLD cost. If no candidate qualifies, the result is
+  DROPPED. The recreated output is the input's `CellOutput` bytes, copied verbatim, so it has the same capacity
+  and lock.
+- **More than one Node Cell for `T ‖ R`.** In honest operation this does not happen: Create and Rewrap make one
+  Node Cell per runner, and the lock's node path allows exactly one output with the same lock (error 12). But
+  nothing stops a third party from creating a lookalike cell with the same lock and arbitrary data. Such a cell
+  can never be spent through the node path with a wrong key: release would fail with error 21, and the service
+  checks the key before it publishes anything. However, a state-0 lookalike with an early deadline would
+  otherwise be recommitted with our pubkey and then released early, on-chain and valid. Therefore index 0 is
+  used only if every qualifying candidate has byte-identical data; otherwise the status is `bad_payload`, with
+  no skeleton and nothing deleted. The residual risk is a griefing DoS on that runner (documented, not a leak).
+- A queried cell that `chain_read` reports dead (we lost a race with our own commit/release) gives `hold`:
+  nothing is deleted or written, and the next run sees the new state. Undecodable Node Cell data, a malformed
+  `cells_query` answer or an unexpected `kv_get` code all give `bad_payload` (inputs unusable; nothing written
+  or deleted).
+- `key_lost` also covers these cases: a stored entry that is not 32 bytes or not a valid scalar; a failed
+  `kv_put` (quota), where nothing is committed and the next run tries KEYGEN again; eight bad draws; and, at
+  RELEASE only, a stored key whose pubkey differs from the Node Cell's (it is never published). That check
+  needs a scalar multiplication, so HOLD skips it and stays cheap. The return codes of `kv_mark_secret`,
+  `delete_on_consume` and `tx_skeleton_put` are not acted on, because a run cannot do anything useful about
+  them.
+- RELEASE `since` is `0x40 ‖ (deadline + GRACE)`, not the current median time. A deadline whose
+  `deadline + GRACE` overflows or exceeds 56 bits stays in HOLD forever, because no `since` can express it.
+- Release build for riscv64 (`cargo build --release --target riscv64imac-unknown-none-elf`) succeeds: the
+  binary is about 71 208 bytes. Phase 3's build script will produce the definitive one.
+- Extra tests beyond the named ones: `keygen_redraws_out_of_range_scalar` and `lost_race_holds_and_keeps_key`.
+
 ### Phase 1 — host bindings and mock host
 
 - 2026-11-15 — `service/` workspace with `crt-host` and `crt-service` (lib stub; the state machine follows in

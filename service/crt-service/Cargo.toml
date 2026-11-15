@@ -4,8 +4,22 @@ version = "0.1.0"
 edition = "2021"
 publish = false
 
+[[bin]]
+name = "crt-service"
+path = "src/main.rs"
+test = false
+
 [features]
 mock = ["crt-host/mock"]
 
 [dependencies]
 crt-host = { path = "../crt-host" }
+crt-core = { path = "../../contracts/crt-core" }
+
+# The binary entry point only exists on the CKB-VM target; host-side `cargo test` builds the library.
+[target.'cfg(target_arch = "riscv64")'.dependencies]
+ckb-std = { workspace = true }
+
+[dev-dependencies]
+# Only used by the tests to prove the hand-built skeleton is a valid molecule `Transaction`.
+ckb-types = "1.1.4"
