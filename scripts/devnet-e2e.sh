@@ -142,7 +142,9 @@ TOML
     IDENT=$("$BIN" identity --json)
     LOCK_ARGS=$(printf '%s' "$IDENT" | json runner_lock_args)
     PUBKEY=$(printf '%s' "$IDENT" | json service_pubkey)
-    PEER=$(printf '%s' "$IDENT" | json runner_id)   # 0.6.x calls the peer id "runner_id"
+    # the registration is attested for the CKB node's peer id (what `csr register consent-message` signs), not the runner id
+    PEER=$(curl -fsS -X POST -H 'content-type: application/json' --data '{"id":1,"jsonrpc":"2.0","method":"local_node_info","params":[]}' "$RPC" \
+      | python3 -I -c 'import json,sys; print(json.load(sys.stdin)["result"]["node_id"])')
     "$CSR_DEV" --rpc "$RPC" --json fund --lock-args "$LOCK_ARGS" --ckb 1200 >/dev/null
     STAKE=$("$CSR_DEV" --rpc "$RPC" --json dao-deposit --ckb 10000)
     STAKE_OP="$(printf '%s' "$STAKE" | json tx_hash):$(printf '%s' "$STAKE" | json index)"
