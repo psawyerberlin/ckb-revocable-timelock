@@ -69,7 +69,7 @@ export function renderShell(root: HTMLElement): HTMLElement {
     if (mainnetNote) main.append(mainnetNote);
     main.append(walletPanel, routeHost);
     const header = el('header', { class: 'bar' }, el('h1', {}, 'CRT — revocable timelock'),
-      el('nav', { 'aria-label': 'Primary' }, el('a', { href: '#/create/deadline' }, 'Create a switch'), el('a', { href: '/' }, 'Overview'), el('a', { href: '/how-it-works.html' }, 'How it works')));
+      el('nav', { 'aria-label': 'Primary' }, el('a', { href: '#/create/deadline' }, 'Create a switch'), el('a', { href: '#/switches' }, 'My switches'), el('a', { href: '#/recover' }, 'Recover'), el('a', { href: '/' }, 'Overview'), el('a', { href: '/how-it-works.html' }, 'How it works')));
     const wrap = el('div', { class: 'shell' }, header, main);
     root.replaceChildren(wrap);
   };

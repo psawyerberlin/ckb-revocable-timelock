@@ -6,6 +6,14 @@ what was chosen and why. Protocol-changing decisions are also proposed as a `SPE
 
 ## Spec 04 — `crt-web` (`aiworker/04-crt-web.md`)
 
+### Phase 3 — manage and recover
+
+- 2026-11-15 — Routes `#/switches` (My switches) and `#/recover`, linked from the header and the home page. The local list is `localStorage['crt.switches']` keyed by `T` (filtered by network); "Add by T" adds an entry without descriptor. The kit HTML (encrypted envelopes only, no secret) is also stored per `T` in `localStorage['crt.kits']` when the create flow builds it, so "Download kit again" and headroom (which needs the access tree from the descriptor) work later; a switch added by T only shows "headroom unknown".
+- 2026-11-15 — Countdown uses the chain median time (`get_blockchain_info.median_time`), not the local clock. "Last heartbeat age" = median time minus the block timestamp of the transaction that created each runner's live heartbeat job cell (it is recreated on every run); if unreadable it shows "unknown" and the runner counts as armed for headroom. A runner is stale when the age exceeds 3 × HEARTBEAT (SPEC §6.1), using the switch's recorded heartbeat blocks (default 8 000).
+- 2026-11-15 — Cancel: one click opens an inline confirmation, a second click signs. Both buttons use the `primary` style, the same size as Create; red fill. Cancel reclaims the Node Cells in the same transaction (`reclaimNodeCells: true`). Renew asks for a UTC date later than the current deadline and keeps the existing heartbeat parameters. Rewrap lists current runners (drop) and directory runners (add) and says a new Arm and kit follow. Reclaim builds one transaction per click (the job lock takes one job input per transaction).
+- 2026-11-15 — Recover needs no wallet: it uses the selected network's deployment, `collectReleases`, and with a loaded kit `unwrapAllReport` (per-leaf status table). With K: download as hex and "Hand K to the application slot" (`window.crtApplication.onKey`, reports when no slot exists). Without K: the headroom shortfall. With T only (no kit) it lists released runners and asks for the kit, since envelopes are not on chain. K is never rendered.
+- 2026-11-15 — Nothing here ran against a chain; checked by typecheck and build only. `npm test` is still the placeholder (vitest is phase 4).
+
 ### Phase 2 — create flow
 
 - 2026-11-15 — Routing is hash-based (`#/create/<step>`, steps deadline → runners → quote → create → arm → kit): the app is a static directory under `/app/`, so no server rewrite is needed. State lives in `src/draft.ts` (sessionStorage, amounts as shannon strings); the secret `K` is held in memory only and never stored. The kit (encrypted envelopes only) is kept in sessionStorage until "Finish".

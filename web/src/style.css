@@ -35,3 +35,9 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .totals { gap: 2rem; }
 .progress-list { padding-left: 1.2rem; }
 #mismatch { border-left-width: 6px; }
+
+/* manage */
+ul.plain { list-style: none; padding: 0; }
+.actions { margin: .6rem 0; }
+button.cancel-btn { background: var(--cancel); border-color: var(--cancel); color: #fff; }
+.switch h3 { margin-top: 0; }

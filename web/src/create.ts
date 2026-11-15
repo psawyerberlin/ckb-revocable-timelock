@@ -14,7 +14,7 @@ import { computeQuote, fmt } from './quote.ts';
 import { QUANTUM_DISCLAIMER, YEAR_SECONDS, durationRisk, suggestedStructure } from './risk.ts';
 import { clearKit, loadKit, memory, saveKit } from './secrets.ts';
 import { session } from './session.ts';
-import { rememberSwitch } from './switches.ts';
+import { rememberSwitch, storeKit } from './switches.ts';
 import { bytesToHex as hex } from '@crt/client';
 
 export const STEPS = ['deadline', 'runners', 'quote', 'create', 'arm', 'kit'] as const;
@@ -377,7 +377,7 @@ function armScreen(host: HTMLElement, d: Draft): void {
     }
     msg.remove();
     memory.K = K; memory.descriptor = v.descriptor; memory.hash = v.hash;
-    try { saveKit(await makeKit(c, v), kitFileName(c.T)); } catch (e) { out.append(el('p', { class: 'err', role: 'alert' }, `Could not build the kit: ${err(e)}`)); return; }
+    try { const html = await makeKit(c, v); saveKit(html, kitFileName(c.T)); storeKit(c.T, html); } catch (e) { out.append(el('p', { class: 'err', role: 'alert' }, `Could not build the kit: ${err(e)}`)); return; }
     const sign = el('button', { type: 'button', class: 'primary', id: 'sign-arm' }, 'Sign Arm');
     sign.disabled = !session.wallet;
     const st = el('p', { role: 'status' });
