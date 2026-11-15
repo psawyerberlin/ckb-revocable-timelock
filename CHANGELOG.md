@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `@crt/client` packaging: the build copies `vendor/csr-job.mjs` into `dist/vendor/` and checks that the built entry
+  loads; `main`/`types`/`exports` point at `dist/src/` where `tsc` writes them. Before, `dist/` could not be imported.
 - `@crt/client`: minimum term 30 minutes on testnet and devnet (client check, like `n`; mainnet keeps 1 day) for short
   rehearsals such as the dead-man-switch fire drill; Arm and Renew validate with the deployment's network. `GRACE` stays 24 h.
 - `deployments/testnet-runners.json`: first entry (pswsl).

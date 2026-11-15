@@ -7,12 +7,13 @@
   "engines": {
     "node": ">=22"
   },
-  "main": "dist/index.js",
+  "main": "dist/src/index.js",
   "bin": { "crt": "bin/crt.ts" },
-  "types": "dist/index.d.ts",
+  "types": "dist/src/index.d.ts",
+  "exports": { ".": { "types": "./dist/src/index.d.ts", "default": "./dist/src/index.js" } },
   "scripts": {
     "build:kit": "node scripts/build-kit.mjs",
-    "build": "node scripts/build-kit.mjs && tsc -p tsconfig.build.json",
+    "build": "node scripts/build-kit.mjs && tsc -p tsconfig.build.json && node scripts/finish-dist.mjs",
     "crt": "tsx bin/crt.ts",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test --test-reporter=tap test/*.test.ts"
