@@ -218,9 +218,11 @@ await step('4 renew once (+10 min): deadline moves, descriptor and I unchanged',
   const before = await crt.readSwitch(T, swCtx);
   state.deadline += 600;
   await send(await crt.buildRenew(T, state.deadline, undefined, ctx));
-  const after = await crt.readSwitch(T, swCtx);
+  // the Renew transaction needs its proposal window: mine while waiting for the new deadline
+  let after = await crt.readSwitch(T, swCtx);
+  for (let i = 0; i < 20 && after.deadline !== BigInt(state.deadline); i++) { await mine(2); after = await crt.readSwitch(T, swCtx); }
   assert(after.state === 'armed', `armed after renew (state ${after.state})`);
-  assert(after.deadline === BigInt(state.deadline), `deadline moved by 10 minutes (got ${after.deadline})`);
+  assert(after.deadline === BigInt(state.deadline), `deadline moved by 10 minutes (expected ${state.deadline}, got ${after.deadline})`);
   assert(after.descriptorHash === before.descriptorHash, 'descriptor hash unchanged');
 });
 
