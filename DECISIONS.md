@@ -159,7 +159,7 @@ Phase 1 — primitives
   threshold tree has `mandatory: null`.
 - 2026-11-15 — `parseResult` accepts `"CRT1" ‖ status` with or without the trailing 32-byte `T`.
 
- Spec 02 — `crt-service` (`aiworker/02-crt-service.md`)
+## Spec 02 — `crt-service` (`aiworker/02-crt-service.md`)
 
 Phase 5 — documentation
 
@@ -256,7 +256,6 @@ Phase 5 — documentation
   (needed to test the scalar-out-of-range redraw); `kv_put_fail` injects quota errors. Off riscv64 the raw syscall
   returns `u64::MAX`.
 
-main
 
 ## Spec 01 — `crt-contracts` (`aiworker/01-crt-contracts.md`)
 
