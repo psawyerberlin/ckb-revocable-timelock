@@ -6,6 +6,11 @@ what was chosen and why. Protocol-changing decisions are also proposed as a `SPE
 
 ## Spec 02 — `crt-service` (`aiworker/02-crt-service.md`)
 
+### Phase 5 — documentation
+
+- Cycle numbers in `docs/service.md` are stated as "not measured": the smoke script was never run. The state-machine
+  diagram is a text summary; `machine.rs` stays authoritative on check order.
+
 ### Phase 4 — devnet smoke script (written, not run)
 
 - `scripts/devnet-service-smoke.sh` (`--help`, `bash -n` clean) and `scripts/devnet/crt-smoke.mjs` (plain JSON-RPC:
