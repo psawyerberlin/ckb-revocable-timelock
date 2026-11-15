@@ -6,6 +6,21 @@ what was chosen and why. Protocol-changing decisions are also proposed as a `SPE
 
 ## Spec 04 — `crt-web` (`aiworker/04-crt-web.md`)
 
+### Phase 2 — create flow
+
+- 2026-11-15 — Routing is hash-based (`#/create/<step>`, steps deadline → runners → quote → create → arm → kit): the app is a static directory under `/app/`, so no server rewrite is needed. State lives in `src/draft.ts` (sessionStorage, amounts as shannon strings); the secret `K` is held in memory only and never stored. The kit (encrypted envelopes only) is kept in sessionStorage until "Finish".
+- 2026-11-15 — `@crt/client` is consumed from source (`../client/src`) through a Vite alias and a small plugin that resolves the client's bare imports (`@noble/*`, `@ckb-ccc/core`) from `web/node_modules`; `tsconfig.json` has matching `paths`. No package build of the client is needed.
+- 2026-11-15 — Deployment files are bundled with `import.meta.glob('../../deployments/*.json')`, so a missing `testnet.json` (none exists in the repository yet) does not break the build; the Runners screen then says that no deployment file exists.
+- 2026-11-15 — Mandatory runners: access tree `xor(threshold t-of-n over all runners, threshold j-of-m over the marked ones)`, the mandatory branch last (SPEC §7.3). `j` defaults to 1 and is editable when more than one runner is marked. "I understand" is required when exactly one runner is marked and the term exceeds 1 year (`SWITCH_PARAM_RANGES.oneOfOneMandatoryTermSeconds`).
+- 2026-11-15 — Suggested structure follows SPEC §10: 5-of-8 under a year, 6-of-12 above (n changes with the deadline; the user can edit both). "Pick for me" uses `selectRunners` with `requireDepositedValid: false`, because the monitor may be unreachable; the table shows monitor status either way.
+- 2026-11-15 — "Switches served" = Node Cells whose lock args end with the runner's `R`, counted from one prefix scan of the node lock; shown as "—" if the indexer query fails. Country/ASN comes from the client's `diversityKey`; "unknown" never counts as a collision.
+- 2026-11-15 — All switch parameters (heartbeat slider, tips, max fee, organiser fee) live on the Quote screen so the estimate updates live, as SPEC §6.2 asks. The quote is always `estimateCost`; for the defaults it gives 1 524.84 spent / 4 441 locked (SPEC table: ≈1 530 / ≈4 440).
+- 2026-11-15 — Organiser fee: default 50 CKB per SPEC, shown as its own line, editable to 0 (button). The organiser address is app-defined and none is configured in this repository: it is read from `VITE_CRT_ORGANISER_ADDRESS` at build time. Without it, Create refuses a non-zero fee with a message telling the owner to set it to 0 (no invented address).
+- 2026-11-15 — Create waits for commits by polling `readSwitch` every 6 s and listing each runner (unconfirmed / waiting / committed). Arm is enabled only when all runners are in state ≥ 1. The switch is also added to the local `crt.switches` list (key `T`) for phase 3.
+- 2026-11-15 — Arm: `buildVerifiedDescriptor` (hard fail) runs first; a `VerificationError` becomes a "MISMATCH (rule N)" block with the rule number and no button to continue. The owner may paste their own 32-byte secret or let the app generate one (shown once, hex). The kit is built (`wrapKey`; the anchored variant needs the Arm already mined) before Arm is signed, so a failed kit never leaves an armed switch without one.
+- 2026-11-15 — Kit: file name `crt-kit-<first 8 hex of T>.html`; "Finish" stays disabled until "I have saved the kit" is ticked, and a `beforeunload` warning is active until then. "Mirror to coordinator" is a disabled, unchecked switch. Nothing here was run against a chain (none available); the flow is typechecked, built and its pure parts (quote, risk, coalition, tree) checked by script.
+- 2026-11-15 — `npm test` is still the phase-1 placeholder; the vitest suite is phase 4.
+
 ### Phase 1 — shell and wallet
 
 - 2026-11-15 — `web/` is a Vite + TypeScript project (no UI framework), `base: '/app/'`, `npm run build` = typecheck, `vite build`, then `scripts/copy-to-site.mjs` replaces `site/app/` with `web/dist/`.

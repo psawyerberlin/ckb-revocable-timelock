@@ -16,3 +16,22 @@ button.primary { background: var(--ink); color: var(--paper); }
 button:disabled { opacity: .5; cursor: not-allowed; }
 select { font: inherit; padding: .4rem; background: var(--paper); color: var(--ink); border: 1px solid var(--ink); }
 .addr { font-family: var(--mono); word-break: break-all; }
+
+/* create flow */
+.steps { display: flex; flex-wrap: wrap; gap: .4rem 1.2rem; list-style: none; padding: 0; margin: 0 0 1rem; color: var(--mid); }
+.field { margin: .8rem 0; }
+.field label { display: block; font-weight: 600; }
+.field input[type="text"], .field input[type="number"], .field input[type="date"] { font: inherit; padding: .4rem; background: var(--paper); color: var(--ink); border: 1px solid var(--ink); max-width: 100%; }
+.field input[type="range"] { width: 100%; max-width: 30rem; }
+.hint { margin: .2rem 0 0; font-size: .9rem; max-width: none; }
+.nav-row { margin-top: 1.2rem; }
+a.btn { text-decoration: none; display: inline-block; }
+a.btn.primary { background: var(--ink); color: var(--paper); }
+.scroll { overflow-x: auto; }
+table.runners, table.quote { border-collapse: collapse; width: 100%; font-size: .95rem; }
+table.runners th, table.runners td, table.quote th, table.quote td { text-align: left; padding: .35rem .5rem; border-bottom: 1px solid var(--rule); vertical-align: top; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.badge { font-size: .8rem; border: 1px solid var(--mid); padding: 0 .35rem; color: var(--mid); }
+.totals { gap: 2rem; }
+.progress-list { padding-left: 1.2rem; }
+#mismatch { border-left-width: 6px; }

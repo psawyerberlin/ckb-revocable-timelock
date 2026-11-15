@@ -1,20 +1,15 @@
 import {
   MAINNET_DISABLED_TEXT, isNetworkAvailable, type NetworkName,
 } from './networks.ts';
+import { el } from './dom.ts';
+import { updateSession } from './session.ts';
 import { connect, formatCkb, listWallets, type WalletInfo, type WalletOption } from './wallet.ts';
 
 const NETWORK_KEY = 'crt.network';
 
-function el<K extends keyof HTMLElementTagNameMap>(
-  tag: K, attrs: Record<string, string> = {}, ...kids: (Node | string)[]
-): HTMLElementTagNameMap[K] {
-  const e = document.createElement(tag);
-  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
-  e.append(...kids);
-  return e;
-}
-
-export function renderShell(root: HTMLElement): void {
+/** Renders the shell and returns the element the router draws the current screen into. */
+export function renderShell(root: HTMLElement): HTMLElement {
+  const routeHost = el('div', { id: 'route' });
   let network: NetworkName = localStorage.getItem(NETWORK_KEY) === 'mainnet' && isNetworkAvailable('mainnet') ? 'mainnet' : 'testnet';
   let wallets: WalletOption[] = [];
   let active: WalletOption | undefined;
@@ -32,6 +27,7 @@ export function renderShell(root: HTMLElement): void {
     }
     netSel.addEventListener('change', () => {
       network = netSel.value as NetworkName;
+      updateSession({ network });
       localStorage.setItem(NETWORK_KEY, network);
       void disconnect();
     });
@@ -60,7 +56,7 @@ export function renderShell(root: HTMLElement): void {
         const w = wallets[Number(sel.value)];
         if (!w) return;
         busy = true; error = ''; draw();
-        try { info = await connect(w); active = w; }
+        try { info = await connect(w); active = w; updateSession({ wallet: w, info }); }
         catch (e) { error = e instanceof Error ? e.message : String(e); }
         busy = false; draw();
       });
@@ -71,9 +67,9 @@ export function renderShell(root: HTMLElement): void {
 
     const main = el('main', { id: 'main', class: 'shell-main' }, netRow);
     if (mainnetNote) main.append(mainnetNote);
-    main.append(walletPanel);
+    main.append(walletPanel, routeHost);
     const header = el('header', { class: 'bar' }, el('h1', {}, 'CRT — revocable timelock'),
-      el('nav', { 'aria-label': 'Primary' }, el('a', { href: '/' }, 'Overview'), el('a', { href: '/how-it-works.html' }, 'How it works')));
+      el('nav', { 'aria-label': 'Primary' }, el('a', { href: '#/create/deadline' }, 'Create a switch'), el('a', { href: '/' }, 'Overview'), el('a', { href: '/how-it-works.html' }, 'How it works')));
     const wrap = el('div', { class: 'shell' }, header, main);
     root.replaceChildren(wrap);
   };
@@ -83,10 +79,12 @@ export function renderShell(root: HTMLElement): void {
   };
   const disconnect = async () => {
     try { await active?.signer.disconnect?.(); } catch { /* ignore */ }
-    active = undefined; info = undefined; error = ''; load(); draw();
+    active = undefined; info = undefined; error = ''; updateSession({ wallet: undefined, info: undefined }); load(); draw();
   };
 
+  updateSession({ network });
   load(); draw();
   // EIP-6963 providers announce asynchronously: redraw the picker if no wallet is connected.
   setTimeout(() => { if (!info && !busy) { const before = wallets.length; load(); if (wallets.length !== before) draw(); } }, 600);
+  return routeHost;
 }
