@@ -148,7 +148,7 @@ TOML
     STAKE_OP="$(printf '%s' "$STAKE" | json tx_hash):$(printf '%s' "$STAKE" | json index)"
     $DEVNET mine 5 >/dev/null
     MSG=$("$BIN" register consent-message --stake "$STAKE_OP" --json | json message)
-    SIG=$("$CSR_DEV" --json sign-message --text "$MSG" --key genesis | json signature)
+    SIG=$("$CSR_DEV" --rpc "$RPC" --json sign-message --text "$MSG" --key genesis | json signature)
     "$CSR_DEV" --rpc "$RPC" --json attest --peer-id "$PEER" --service-pubkey "$PUBKEY" --stake "$STAKE_OP" \
       --network devnet --out "$RD/att.json" --deployments "$CSR_DIR/deployments/devnet.json" >/dev/null
     "$BIN" register create --stake "$STAKE_OP" --consent "$SIG" --attestation "$RD/att.json" --json >/dev/null
