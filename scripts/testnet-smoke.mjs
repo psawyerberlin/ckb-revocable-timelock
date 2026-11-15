@@ -13,7 +13,7 @@
 //   cancel     cancel the switch (the Alive Cell is consumed; the Node Cells stay)
 //   recover    after deadline + GRACE: collect the releases and recover K from the chain; compares it to the wrapped K
 // Options:
-//   --key-file FILE      the owner key (hex; never printed). Pays about 600 CKB, most of it refundable
+//   --key-file FILE      the owner key (hex; never printed); needed for create, renew, cancel. Pays about 600 CKB, mostly refundable
 //   --identity FILE      output of `csr identity --json` of the runner (runner_lock_hash, service_pubkey)
 //   --rpc URL            testnet node with the indexer (default http://127.0.0.1:8112)
 //   --state DIR          state directory (default .devnet/testnet-smoke; files hold K: keep them private)
@@ -41,7 +41,7 @@ if (!['create', 'status', 'renew', 'cancel', 'recover'].includes(cmd) || !['canc
   console.error('usage: testnet-smoke.mjs <create|status|renew|cancel|recover> --name <cancel|release> [--key-file F --identity F --rpc URL]');
   process.exit(2);
 }
-if (!opt.key) { console.error('--key-file is required'); process.exit(2); }
+if (!opt.key && ['create', 'renew', 'cancel'].includes(cmd)) { console.error(`--key-file is required for ${cmd}`); process.exit(2); }
 const DAY = 86400, GRACE = 86400;
 const hex = (u8) => '0x' + Buffer.from(u8).toString('hex');
 const unhex = (s) => new Uint8Array(Buffer.from(s.replace(/^0x/, ''), 'hex'));
@@ -52,7 +52,8 @@ const crt = await import(resolve(ROOT, 'client/src/index.ts'));
 const ccc = (createRequire(resolve(ROOT, 'client/package.json'))('@ckb-ccc/core').ccc) ?? createRequire(resolve(ROOT, 'client/package.json'))('@ckb-ccc/core');
 const deployment = crt.parseDeployment(JSON.parse(readFileSync(resolve(ROOT, 'deployments/testnet.json'), 'utf8')));
 const client = new ccc.ClientPublicTestnet({ url: opt.rpc });
-const signer = new ccc.SignerCkbPrivateKey(client, readFileSync(opt.key, 'utf8').trim());
+// status and recover only read the chain: no key needed
+const signer = opt.key ? new ccc.SignerCkbPrivateKey(client, readFileSync(opt.key, 'utf8').trim()) : null;
 const ctx = { signer, deployment };
 const swCtx = { rpc: new crt.RpcClient(opt.rpc), deployment };
 mkdirSync(opt.state, { recursive: true });
