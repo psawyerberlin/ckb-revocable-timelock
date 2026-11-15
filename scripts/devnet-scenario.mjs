@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // CRT devnet end-to-end scenario (aiworker/05-crt-devnet-e2e.md, Phase 2).
-// Run after `bash scripts/devnet-e2e.sh`:   node --experimental-strip-types scripts/devnet-scenario.mjs [options]
+// Run after `bash scripts/devnet-e2e.sh`:   client/node_modules/.bin/tsx scripts/devnet-scenario.mjs  (after `cd client && npm ci`) [options]
 //   --state DIR     state dir of devnet-e2e.sh (default .devnet/e2e)
 //   --rpc URL       devnet RPC (default http://127.0.0.1:18114)
 //   --runners N     number of runners (default 3)
@@ -97,7 +97,7 @@ async function waitFor(what, fn, timeoutS = 600) {
   for (;;) { const v = await fn(); if (v) return v; if (Date.now() > end) throw new Error(`timeout waiting for ${what}`); await sleep(3000); }
 }
 
-// ---- client (TypeScript sources; run this script with node >= 22.6 --experimental-strip-types) -------------------
+// ---- client (TypeScript sources; run this script with the client's tsx) -------------------
 const crt = await import(resolve(ROOT, 'client/src/index.ts'));
 const { ccc } = await import(resolve(ROOT, 'client/node_modules/@ckb-ccc/core/dist.commonjs/index.js')).catch(() => import('@ckb-ccc/core'));
 const deployment = crt.parseDeployment(JSON.parse(readFileSync(resolve(ROOT, 'deployments/devnet.json'), 'utf8')));

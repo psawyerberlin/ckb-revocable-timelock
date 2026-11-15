@@ -3,7 +3,7 @@
 ```sh
 bash scripts/build-contracts.sh && bash scripts/build-service.sh
 bash scripts/devnet-e2e.sh                 # node, CSR contracts, crt-node-lock, 3 runners; idempotent
-node --experimental-strip-types scripts/devnet-scenario.mjs
+(cd client && npm ci) && client/node_modules/.bin/tsx scripts/devnet-scenario.mjs
 bash scripts/devnet-e2e.sh --down
 ```
 

@@ -12,7 +12,7 @@ with a CKB node binary, Docker-free, with Rust, Node 22 and Python 3.
 bash scripts/build-contracts.sh
 bash scripts/build-service.sh
 bash scripts/devnet-e2e.sh --runners 3
-node --experimental-strip-types scripts/devnet-scenario.mjs      # prints PASS lines and measured cycles
+(cd client && npm ci) && client/node_modules/.bin/tsx scripts/devnet-scenario.mjs      # prints PASS lines and measured cycles
 bash scripts/devnet-e2e.sh --down
 ```
 
