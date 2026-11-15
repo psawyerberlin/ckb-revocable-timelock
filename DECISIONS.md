@@ -6,6 +6,47 @@ what was chosen and why. Protocol-changing decisions are also proposed as a `SPE
 
 ## Spec 03 — `crt-client` (`aiworker/03-crt-client.md`)
 
+### Phase 3 — transaction builders
+
+- 2026-11-15 — `@ckb-ccc/core` 1.23 added as the third runtime dependency. All chain reads of the builders go through
+  `signer.client` (a `ccc.Client`), so one `{signer, deployment}` context suffices; tests mock it with
+  `ccc.ClientPublicTestnet.new({transport})` answering `get_cells`/`get_tip_header` from fixtures, and a
+  `ccc.SignerCkbPublicKey` (no private key). Every builder ends with `completeInputsByCapacity` + `completeFeeBy` and
+  makes sure at least one input carries the signer's lock (owner path of `crt-node-lock`, refund path of the job lock).
+- 2026-11-15 — Signatures: `buildCreate(args)` as written (returns `{tx, T, I, nodeCellIndices, keygenJobIndices,
+  organiserFeeIndex, ownerLockHash, params, warnings}`). The owner builders take the context as an extra **last**
+  argument: `buildArm(T, h, ctx)`, `buildRenew(T, newDeadline, params?, ctx)`, `buildRewrap(T, dropR, addRunners, ctx)`,
+  `buildCancel(T, opts?, ctx)`, `buildReclaim(T, ctx)`; `txBuilders(ctx)` returns them bound, with exactly the call
+  shapes of the spec (`buildArm(T, h)`, `buildRenew(T, d, params?)`, …).
+- 2026-11-15 — **Deviation from SPEC §6 / spec 03 (proposed SPEC change):** CSR's `csr-job-type` rejects more than one job
+  output per service group in a transaction (job-cell-standard §3, F-CON-007, error 9), and a runner's keygen and
+  heartbeat jobs have the same type script (service ID of that runner). Create therefore carries the `n` keygen jobs
+  only; the `n` heartbeat jobs are created by **Arm** (for every runner without a live heartbeat job for `T`, params
+  from `ctx.params`, else the switch's live heartbeat jobs, else the §6.2 defaults; `buildCreate` returns the validated
+  params to pass on). Nothing needs heartbeats before Arm (the switch is not usable yet), and walking away after Create
+  parks less capacity. Rewrap likewise creates keygen jobs for new runners; the next Arm adds their heartbeat jobs.
+- 2026-11-15 — **Reclaim is one job per transaction:** the CSR job lock accepts exactly one job input (error 7). `buildReclaim`
+  takes all Node Cells of `T` plus the expired job with the lowest `expiry_block` (`since` = expiry block, absolute
+  block form, flags 0; only jobs with `refund_lock_hash` = signer lock and `expiry_block ≤ tip`); call again for the next
+  job. Jobs are found per runner (`job_type` args = `crtServiceId(R)`, payload = `jobPayload(T)`); Rs come from the live
+  Node Cells plus `ctx.runners` (needed after a cancel that already destroyed the Node Cells). No registry dep.
+- 2026-11-15 — Heartbeat job term = `deadline + GRACE − now` (so the release run is covered); `remainingRuns =
+  ceil(term_blocks / HEARTBEAT)` with `term_blocks = term / block_seconds` (10.8 s default as in the cost estimator,
+  same epsilon); `expiry_block = tip + runs × HEARTBEAT + 7 days of blocks`; keygen `expiry_block = tip + 7 days`.
+  `max_cycles` 100 M. "now" is the tip header timestamp unless `ctx.now` is given. Job cells use exactly
+  `minJobCapacity` (`jobCell` of csr-job.mjs).
+- 2026-11-15 — Create: output 0 Alive Cell (owner lock, type-id, occupied capacity), outputs 1..n Node Cells (244 CKB with
+  a 64-byte-args data2 lock), then keygen jobs, then the organiser fee output (only if `organiserFee > 0`; needs
+  `organiserLock` and must cover the output's occupied capacity, else an error), then change. `T =
+  ccc.hashTypeId(inputs[0], 0)`: outputs are first laid out with `T = 0`, inputs collected, then rewritten with the real
+  `T` (sizes do not depend on `T`) before the fee is completed; a check asserts input 0 did not change. No node-lock
+  dep on Create (output locks do not run), job deps from `jobCellDeps`.
+- 2026-11-15 — Arm requires every Node Cell in state 1 and a common deadline; it does not call `verifyNodes` itself (the
+  caller verifies against the descriptor first, as SPEC §6 orders). Renew refuses a released switch and requires
+  heartbeat params (argument or live jobs). Rewrap keeps the deadline and leaves kept Node Cells untouched (their old
+  `descriptor_hash` is replaced by the next Arm). Cancel consumes the Alive Cell (+ Node Cells by default) and has only
+  the signer's change as output; a final assertion rejects any type-id output.
+
 ### Phase 2 — chain access
 
 - 2026-11-15 — `csr-job.mjs` and `csr-job.sha256` were already vendored in phase 1 (v0.1 tag header, hash verified unchanged);

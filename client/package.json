@@ -4,7 +4,9 @@
   "private": true,
   "type": "module",
   "description": "CKB Revocable Timelock client library",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
@@ -13,6 +15,7 @@
     "test": "tsx --test --test-reporter=tap test/*.test.ts"
   },
   "dependencies": {
+    "@ckb-ccc/core": "^1.23.0",
     "@noble/hashes": "^1.8.0",
     "@noble/secp256k1": "^2.3.0"
   },
