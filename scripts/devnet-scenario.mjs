@@ -16,6 +16,7 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
+import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -35,7 +36,7 @@ for (let i = 0; i < argv.length; i++) {
   else { console.error(`unknown option ${a}`); process.exit(2); }
 }
 
-const GRACE = 3600; // seconds, SPEC GRACE
+const GRACE = 86400; // seconds, SPEC.md GRACE (24 h), as in crt-core
 const TEN_MIN = 600;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const results = []; // {name, ok, note}
@@ -99,10 +100,21 @@ async function waitFor(what, fn, timeoutS = 600) {
 
 // ---- client (TypeScript sources; run this script with the client's tsx) -------------------
 const crt = await import(resolve(ROOT, 'client/src/index.ts'));
-const { ccc } = await import(resolve(ROOT, 'client/node_modules/@ckb-ccc/core/dist.commonjs/index.js')).catch(() => import('@ckb-ccc/core'));
+const cccMod = createRequire(resolve(ROOT, 'client/package.json'))('@ckb-ccc/core');
+const ccc = cccMod.ccc ?? cccMod;
 const deployment = crt.parseDeployment(JSON.parse(readFileSync(resolve(ROOT, 'deployments/devnet.json'), 'utf8')));
-const cccClient = new ccc.ClientPublicTestnet({ url: opt.rpc, scripts: deployment.ccc_scripts ?? undefined });
-const signer = new ccc.SignerCkbPrivateKey(cccClient, opt.key || readFileSync(resolve(opt.state, 'owner.key'), 'utf8').trim());
+// devnet system scripts: CCC's built-in tables point at testnet cells, so the genesis dep groups are named here
+// (genesis tx 1: output 0 = secp256k1 blake160 sighash dep group, output 1 = multisig dep group)
+const genesis = await rpc('get_block_by_number', ['0x0']);
+const depGroup = (index) => [{ cellDep: { outPoint: { txHash: genesis.transactions[1].hash, index }, depType: 'depGroup' } }];
+const cccScripts = {
+  [ccc.KnownScript.Secp256k1Blake160]: { codeHash: '0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8', hashType: 'type', cellDeps: depGroup(0) },
+  [ccc.KnownScript.Secp256k1Multisig]: { codeHash: '0x5c5069eb0857efc65e1bca0c07df34c31663b3622fd3876c876320fc9634e2a8', hashType: 'type', cellDeps: depGroup(1) },
+};
+const cccClient = new ccc.ClientPublicTestnet({ url: opt.rpc, scripts: cccScripts });
+// the owner pays with the devnet genesis (funding) key unless --key / CRT_OWNER_KEY is given (public devnet test key)
+const ownerKey = opt.key || JSON.parse(readFileSync(resolve(ROOT, '.refs/csr/devtools/devnet-keys.json'), 'utf8')).genesis.privkey;
+const signer = new ccc.SignerCkbPrivateKey(cccClient, ownerKey);
 const ctx = { signer, deployment };
 const rpcClient = new crt.RpcClient(opt.rpc);
 const runnerInfo = [1, 2, 3, 4].slice(0, opt.runners).map((i) => JSON.parse(readFileSync(resolve(runnerDir(i), 'crt/runner.json'), 'utf8')));
