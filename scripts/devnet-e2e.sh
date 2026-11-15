@@ -8,7 +8,7 @@
 #   --down           stop the runners and the devnet node (state under .devnet/ is kept)
 #   --csr DIR        CSR checkout, built (csr, csr-dev) with `cargo build` (default .refs/csr, v0.6.1)
 #   --elf PATH       crt-service.elf (default service/build/crt-service.elf)
-#   --node-lock PATH crt-node-lock binary (default build/crt-node-lock)
+#   --node-lock PATH crt-node-lock binary (default contracts/build/release/crt-node-lock)
 #   --state DIR      state directory (default .devnet/e2e)
 #   --runners N      number of CSR runners (default 3)
 #   --help           this text
@@ -18,7 +18,7 @@
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-CSR_DIR="$ROOT/.refs/csr"; ELF="$ROOT/service/build/crt-service.elf"; NODE_LOCK="$ROOT/build/crt-node-lock"
+CSR_DIR="$ROOT/.refs/csr"; ELF="$ROOT/service/build/crt-service.elf"; NODE_LOCK="$ROOT/contracts/build/release/crt-node-lock"
 STATE="$ROOT/.devnet/e2e"; N=3; DOWN=0
 RPC=http://127.0.0.1:18114
 

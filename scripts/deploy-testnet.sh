@@ -3,14 +3,14 @@
 #
 # Usage: deploy-testnet.sh --key-file FILE [--node-lock PATH] [--csr DIR] [--rpc URL] [--dry-run] [--help]
 #   --key-file FILE  file with the deployer private key (hex), never printed, never stored
-#   --node-lock PATH crt-node-lock binary (default build/crt-node-lock)
+#   --node-lock PATH crt-node-lock binary (default contracts/build/release/crt-node-lock)
 #   --csr DIR        CSR checkout with a built csr-dev (default .refs/csr)
 #   --rpc URL        testnet RPC (default https://testnet.ckb.dev/)
 #   --dry-run        build and print the transactions, send nothing, write nothing
 # Refuses to overwrite an existing deployments/testnet.json.
 set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-KEY=""; NODE_LOCK="$ROOT/build/crt-node-lock"; CSR_DIR="$ROOT/.refs/csr"; RPC=https://testnet.ckb.dev/; DRY=0
+KEY=""; NODE_LOCK="$ROOT/contracts/build/release/crt-node-lock"; CSR_DIR="$ROOT/.refs/csr"; RPC=https://testnet.ckb.dev/; DRY=0
 usage() { sed -n '2,/^set -euo/p' "$0" | sed '$d' | sed 's/^# \{0,1\}//'; }
 while [ $# -gt 0 ]; do
   case "$1" in

@@ -7,7 +7,7 @@
 #                                [--create-switch CMD] [--help]
 #   --csr DIR            CSR checkout (default .refs/csr)
 #   --elf PATH           crt-service.elf (default service/build/crt-service.elf)
-#   --node-lock PATH     crt-node-lock binary (default build/crt-node-lock)
+#   --node-lock PATH     crt-node-lock binary (default contracts/build/release/crt-node-lock)
 #   --workdir DIR        service state dir (default .devnet/crt-service-smoke)
 #   --create-switch CMD  command that creates ONE switch on the devnet for runner lock hash $CRT_R and prints
 #                        "<T hex> <deadline unix seconds>" (default: client/scripts/devnet-create-switch.mjs if present).
@@ -17,7 +17,7 @@
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-CSR_DIR="$ROOT/.refs/csr"; ELF="$ROOT/service/build/crt-service.elf"; NODE_LOCK="$ROOT/build/crt-node-lock"
+CSR_DIR="$ROOT/.refs/csr"; ELF="$ROOT/service/build/crt-service.elf"; NODE_LOCK="$ROOT/contracts/build/release/crt-node-lock"
 WORK="$ROOT/.devnet/crt-service-smoke"; CREATE=""
 GRACE=86400
 
