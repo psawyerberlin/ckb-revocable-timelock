@@ -122,7 +122,12 @@ const deployment = crt.parseDeployment(JSON.parse(readFileSync(resolve(ROOT, 'de
 // (genesis tx 1: output 0 = secp256k1 blake160 sighash dep group, output 1 = multisig dep group)
 const genesis = await rpc('get_block_by_number', ['0x0']);
 const depGroup = (index) => [{ cellDep: { outPoint: { txHash: genesis.transactions[1].hash, index }, depType: 'depGroup' } }];
+// Nervos DAO: the genesis cell whose type script hashes to the DAO code hash (the same on every default-spec chain)
+const DAO_CODE_HASH = '0x82d76d1b75fe2fd9a27dfbaa65a039221a380d76c926f378d3f81cf3e7e13f2e';
+const daoIndex = genesis.transactions[0].outputs.findIndex((o) => o.type && ccc.Script.from({ codeHash: o.type.code_hash, hashType: o.type.hash_type, args: o.type.args }).hash() === DAO_CODE_HASH);
+if (daoIndex < 0) throw new Error('genesis block has no Nervos DAO cell');
 const cccScripts = {
+  [ccc.KnownScript.NervosDao]: { codeHash: DAO_CODE_HASH, hashType: 'type', cellDeps: [{ cellDep: { outPoint: { txHash: genesis.transactions[0].hash, index: '0x' + daoIndex.toString(16) }, depType: 'code' } }] },
   [ccc.KnownScript.Secp256k1Blake160]: { codeHash: '0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8', hashType: 'type', cellDeps: depGroup(0) },
   [ccc.KnownScript.Secp256k1Multisig]: { codeHash: '0x5c5069eb0857efc65e1bca0c07df34c31663b3622fd3876c876320fc9634e2a8', hashType: 'type', cellDeps: depGroup(1) },
   // CCC also scans the owner's anyone-can-pay address; the devnet has no such script, the entry only has to exist
