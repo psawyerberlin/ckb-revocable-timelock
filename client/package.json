@@ -8,10 +8,12 @@
     "node": ">=22"
   },
   "main": "dist/index.js",
+  "bin": { "crt": "bin/crt.ts" },
   "types": "dist/index.d.ts",
   "scripts": {
     "build:kit": "node scripts/build-kit.mjs",
     "build": "node scripts/build-kit.mjs && tsc -p tsconfig.build.json",
+    "crt": "tsx bin/crt.ts",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test --test-reporter=tap test/*.test.ts"
   },

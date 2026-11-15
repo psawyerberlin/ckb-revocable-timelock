@@ -20,40 +20,54 @@ you encrypt, where you keep the ciphertext, who the recipients are — is yours.
 
 ```ts
 import { ccc } from '@ckb-ccc/core';
-import { loadDeployment, listRunners, selectRunners, buildCreate, buildArm, readSwitch, verifyNodes,
-         buildDescriptor, splitKey, wrapKey, generateKit, buildCancel } from '@crt/client';
+import { loadDeployment, RpcClient, fetchRunners, selectRunners, readSwitch, buildCreate, buildArm, buildCancel,
+         defaultSwitchParams, buildVerifiedDescriptor, wrapKey, descriptorHash, generateKit, KIT_VERSION } from '@crt/client';
 
-const dep = await loadDeployment('testnet');                 // deployments/testnet.json
-const signer = /* a CCC signer, e.g. JoyID */;
+const deployment = await loadDeployment('testnet');          // deployments/testnet.json (Node); browsers use parseDeployment
+const rpc = new RpcClient(deployment.rpc_urls);
+const sctx = { rpc, deployment };
+const signer: ccc.Signer = /* any CCC signer, e.g. JoyID */;
 
 // 1. choose runners: staked, attested, diverse; 5-of-8 by default for terms under a year
-const runners = await listRunners(dep);
-const plan = selectRunners(runners, { n: 8 });
-const deadline = Math.floor(Date.now() / 1000) + 180 * 86400;
+const runners = selectRunners(await fetchRunners({ rpc, deployment }), { n: 8 });
+const deadline = BigInt(Math.floor(Date.now() / 1000) + 180 * 86400);
 
-// 2. create: one transaction — Alive Cell, 8 Node Cells, 8 keygen jobs, 8 heartbeat jobs
-const { tx, T, I } = await buildCreate({ signer, deployment: dep, deadline, runners: plan, heartbeatBlocks: 8000n,
-                                         termBlocks: 180n * 8000n, organiserFee: 0n });
+// 2. create: one transaction — Alive Cell, 8 Node Cells, 8 keygen jobs
+const { tx, T } = await buildCreate({
+  signer, deployment, deadline, params: defaultSwitchParams(), validation: { t: 5 },
+  runners: runners.map((r) => ({ R: r.R, servicePubkey: r.servicePubkey })),
+});
 await signer.sendTransaction(tx);
 
-// 3. wait for the 8 commits (Node Cells in state 1), then verify — hard fail, no override
-let sw; do { sw = await readSwitch(dep, T); } while (sw.nodeCells.filter(c => c.state === 1).length < 8);
-await verifyNodes(dep, T, plan);                            // throws VerificationError(rule) on any mismatch
+// 3. wait until all 8 Node Cells are committed (state 1)
+let sw;
+do { await new Promise((r) => setTimeout(r, 15_000)); sw = await readSwitch(T, sctx); }
+while (sw.nodeCells.filter((c) => c.data.state === 1).length < 8);
 
-// 4. descriptor and arm
-const descriptor = await buildDescriptor(dep, T, plan, { kind: 'threshold', t: 5, n: 8, leaves: plan.map((_, i) => ({ node: i })) });
-await signer.sendTransaction(await buildArm({ signer, deployment: dep, T, descriptorHash: descriptor.descriptor_hash }));
-
-// 5. your encryption
+// 4. K, descriptor (hard-fail verification of SPEC §8.3 runs inside; there is no override) and arm
 const K = crypto.getRandomValues(new Uint8Array(32));
+const descriptor = await buildVerifiedDescriptor({
+  K,
+  access_tree: { kind: 'threshold', t: 5, n: 8, leaves: runners.map((_, i) => ({ node: i })) },
+  nodes: runners.map((r) => ({ runner_lock_hash: r.R, service_pubkey: r.servicePubkey, peer_id: r.peerId })),
+}, T, sctx);
+await signer.sendTransaction(await buildArm(T, descriptorHash(descriptor), { signer, deployment }));
+
+// 5. your encryption, then the envelopes and the kit
 const ciphertext = await yourEncrypt(K, plaintext);          // AES-256-GCM in the browser, your format
 const envelopes = await wrapKey(K, descriptor);              // one envelope per leaf, AAD = I ‖ position
-const kitHtml = generateKit({ descriptor, envelopes, application: { name: 'your-app', version: '1', payload: { ciphertext } } });
+const kitHtml = generateKit({ descriptor, envelopes, kitVersion: KIT_VERSION, deadline,
+                              application: { name: 'your-app', version: '1', payload: { ciphertext } } });
 download('kit.html', kitHtml);                               // the only artefact the heir needs
 
 // later: cancel = one signed transaction, no fee of any kind
-await signer.sendTransaction(await buildCancel({ signer, deployment: dep, T }));
+await signer.sendTransaction(await buildCancel(T, { reclaimNodeCells: true }, { signer, deployment }));
 ```
+
+`wrapKeyAnchored(K, descriptor, sctx)` is the stricter variant: it refuses unless every Node Cell already carries the
+descriptor hash, so call it after the Arm transaction is mined.
+
+The same flow from a shell: `npx crt plan`, `crt create`, `crt arm`, `crt kit`, `crt cancel` (see `client/README.md`).
 
 Recovery without your application: the kit alone recovers `K`; with your application hook it also decrypts your
 payload. Recovery without the kit: anyone who still has the descriptor and the envelopes can rebuild the kit

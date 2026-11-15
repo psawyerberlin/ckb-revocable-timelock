@@ -6,6 +6,21 @@ what was chosen and why. Protocol-changing decisions are also proposed as a `SPE
 
 ## Spec 03 — `crt-client` (`aiworker/03-crt-client.md`)
 
+### Phase 5 — CLI and documentation
+
+- 2026-11-15 — **CLI runner.** `client/bin/crt.ts` runs through `tsx` (`npm run crt -- <command>`, `bin` entry in `package.json`);
+  no build step, same runner as the tests. Hand-written argument parser, no extra dependency.
+- 2026-11-15 — **Signing.** Without `--key` the CLI needs `--owner ADDRESS` and prints the unsigned transaction JSON
+  (CCC `Transaction.stringify`) for offline signing. `--key` signs and sends but is refused on `mainnet` and `testnet`.
+- 2026-11-15 — **`arm`** does verification (hard fail, no flag), builds descriptor and envelopes from a plan and a secret `K`
+  (generated unless `--secret`; stored only with `--secret-out`, mode 0600), writes `descriptor.json`/`envelopes.json` and
+  prints the Arm transaction. It wraps with `wrapKey` (not `wrapKeyAnchored`), because the Node Cells carry the hash only
+  after Arm is mined; the descriptor itself was verified against the chain.
+- 2026-11-15 — `plan` writes `{network, nodes, access_tree}` (single threshold tree, default t = ceil(5n/8)); more
+  elaborate trees are edited by hand in the plan file. `deployments/` is looked up in the cwd, then `../deployments`.
+- 2026-11-15 — Added `src/index.ts` as package entry (`main`); `core/hash.ts`'s `descriptorHash` (bytes) is not re-exported
+  there, the kit's `descriptorHash(descriptor)` (hex) is. CLI commands were checked by typecheck and `--help` only (no chain here).
+
 ### Phase 4 — descriptor, kit and recovery
 
 - 2026-11-15 — **Deterministic splitting.** The share commitments are inside the descriptor whose hash goes on chain at
