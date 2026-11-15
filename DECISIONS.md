@@ -4,6 +4,19 @@ Newest spec first. One `##` section per spec, one bullet per decision: what was 
 what was chosen and why. Protocol-changing decisions are also proposed as a `SPEC.md` diff in the PR body
 (`AIWORKER.md` §5).
 
+
+## Spec 05 (crt-devnet-e2e), Phase 1: devnet script
+
+- `scripts/devnet-e2e.sh` is written and only statically checked (`bash -n`, `--help`); no devnet was started.
+- The spec says `crt-enable.sh --csr-bin … --data-root …`; the existing script takes `--csr PATH` and `--workdir`.
+  Each runner gets a wrapper `.devnet/e2e/runnerN/csr` that pins `--data-root`/`--config`, passed as `--csr`.
+- `crt-enable.sh` only accepts `testnet|mainnet`; the devnet 102-byte data cell is built by the e2e script and
+  passed with `--data-cell`. `deployments/devnet.json` (written by the script) carries `node_lock`,
+  `network_id` 2 and the Type ID code hash.
+- Idempotence: markers/JSON files under `.devnet/e2e/`; runners are only started when their pidfile is dead.
+- Exact `csr-dev`/`csr` JSON field names (`runner_lock_args`, `peer_id`, `message`, `tx_hash`, `index`) follow CSR
+  docs/testing.md and must be confirmed on the first manual run.
+
 ## Spec 04 — `crt-web` (`aiworker/04-crt-web.md`)
 
 ### Phase 4 — quality and build
