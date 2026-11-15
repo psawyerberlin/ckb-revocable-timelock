@@ -125,6 +125,8 @@ const depGroup = (index) => [{ cellDep: { outPoint: { txHash: genesis.transactio
 const cccScripts = {
   [ccc.KnownScript.Secp256k1Blake160]: { codeHash: '0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8', hashType: 'type', cellDeps: depGroup(0) },
   [ccc.KnownScript.Secp256k1Multisig]: { codeHash: '0x5c5069eb0857efc65e1bca0c07df34c31663b3622fd3876c876320fc9634e2a8', hashType: 'type', cellDeps: depGroup(1) },
+  // CCC also scans the owner's anyone-can-pay address; the devnet has no such script, the entry only has to exist
+  [ccc.KnownScript.AnyoneCanPay]: { codeHash: '0x3419a1c09eb2567f6552ee7a8ecffd64155cffe0f1796e6e61ec088d740c1356', hashType: 'type', cellDeps: depGroup(0) },
 };
 const cccClient = new ccc.ClientPublicTestnet({ url: opt.rpc, scripts: cccScripts });
 // the owner pays with the devnet genesis (funding) key unless --key / CRT_OWNER_KEY is given (public devnet test key)
