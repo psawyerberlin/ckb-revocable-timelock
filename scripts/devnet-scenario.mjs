@@ -143,7 +143,8 @@ const hbParams = () => ({ ...crt.defaultSwitchParams(), heartbeatBlocks: HB });
 async function send(tx) { const h = await signer.sendTransaction(tx); await mine(4); return h; }
 /** Create with deadline = chain median + 1 day + 10 minutes (the client's minimum term is 1 day) */
 async function createSwitch(k = 2) {
-  const deadline = (await medianSeconds()) + DAY + 600;
+  // the client measures the term from the tip's timestamp, the contracts from the median: take the later one
+  const deadline = Math.max(Math.ceil((await tipMs()) / 1000), await medianSeconds()) + DAY + 600;
   const built = await crt.buildCreate({ signer, deployment, deadline, runners: createRunners, params: hbParams(), validation: { t: k }, blockSeconds: ACCEL });
   await send(built.tx);
   return { ...built, deadline };
