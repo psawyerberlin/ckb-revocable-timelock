@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:crt:schema:descriptor:v1",
+  "title": "CRT recipient descriptor (SPEC.md §8.1)",
+  "description": "Canonicalised with JCS (RFC 8785); descriptor_hash = blake2b256(\"CRT/v1/descriptor\" ‖ JCS(descriptor)). Hex is lowercase with 0x. Semantic rules not expressible here (identity = I(network_id, type_id), leaves index nodes, one commitment per leaf, unique runners) are checked by validateDescriptor.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "network_id", "type_id", "identity", "created_at", "deployment", "alive_cell", "nodes", "access_tree", "share_commitments"],
+  "properties": {
+    "version": { "const": 1 },
+    "network_id": { "type": "integer", "minimum": 0, "maximum": 255 },
+    "type_id": { "$ref": "#/$defs/hex32" },
+    "identity": { "$ref": "#/$defs/hex32" },
+    "created_at": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+    "deployment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["node_lock_code_hash", "crt_code_hash", "crt_data_hash"],
+      "properties": {
+        "node_lock_code_hash": { "$ref": "#/$defs/hex32" },
+        "crt_code_hash": { "$ref": "#/$defs/hex32" },
+        "crt_data_hash": { "$ref": "#/$defs/hex32" }
+      }
+    },
+    "alive_cell": { "$ref": "#/$defs/outPoint" },
+    "nodes": { "type": "array", "minItems": 1, "maxItems": 255, "items": { "$ref": "#/$defs/node" } },
+    "access_tree": { "oneOf": [{ "$ref": "#/$defs/threshold" }, { "$ref": "#/$defs/xor" }] },
+    "share_commitments": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/hex32" } },
+    "coordinator_url": { "type": "string", "maxLength": 2048 }
+  },
+  "$defs": {
+    "hex32": { "type": "string", "pattern": "^0x[0-9a-f]{64}$" },
+    "pubkey": { "type": "string", "pattern": "^0x0[23][0-9a-f]{64}$" },
+    "outPoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tx_hash", "index"],
+      "properties": {
+        "tx_hash": { "$ref": "#/$defs/hex32" },
+        "index": { "type": "integer", "minimum": 0, "maximum": 4294967295 }
+      }
+    },
+    "node": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["runner_lock_hash", "service_pubkey", "node_cell", "pubkey"],
+      "properties": {
+        "runner_lock_hash": { "$ref": "#/$defs/hex32" },
+        "service_pubkey": { "$ref": "#/$defs/pubkey" },
+        "peer_id": { "type": "string", "maxLength": 256 },
+        "node_cell": { "$ref": "#/$defs/outPoint" },
+        "pubkey": { "$ref": "#/$defs/pubkey" },
+        "label": { "type": "string", "maxLength": 256 }
+      }
+    },
+    "leaf": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["node"],
+      "properties": { "node": { "type": "integer", "minimum": 0, "maximum": 254 } }
+    },
+    "threshold": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "t", "n", "leaves"],
+      "properties": {
+        "kind": { "const": "threshold" },
+        "t": { "type": "integer", "minimum": 1, "maximum": 255 },
+        "n": { "type": "integer", "minimum": 1, "maximum": 255 },
+        "leaves": { "type": "array", "minItems": 1, "maxItems": 255, "items": { "$ref": "#/$defs/leaf" } }
+      }
+    },
+    "xor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "branches"],
+      "properties": {
+        "kind": { "const": "xor" },
+        "branches": { "type": "array", "minItems": 2, "items": { "$ref": "#/$defs/threshold" } }
+      }
+    }
+  }
+}

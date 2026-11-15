@@ -10,7 +10,8 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build:kit": "node scripts/build-kit.mjs",
+    "build": "node scripts/build-kit.mjs && tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test --test-reporter=tap test/*.test.ts"
   },
@@ -21,6 +22,8 @@
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "ajv": "8.20.0",
+    "esbuild": "0.28.2",
     "tsx": "^4.19.0",
     "typescript": "^5.6.0"
   }

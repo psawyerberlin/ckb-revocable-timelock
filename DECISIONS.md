@@ -6,6 +6,48 @@ what was chosen and why. Protocol-changing decisions are also proposed as a `SPE
 
 ## Spec 03 — `crt-client` (`aiworker/03-crt-client.md`)
 
+### Phase 4 — descriptor, kit and recovery
+
+- 2026-11-15 — **Deterministic splitting.** The share commitments are inside the descriptor whose hash goes on chain at
+  Arm, before anything is encrypted, yet the API is `wrapKey(K, descriptor, rng)`. So `buildDescriptor(plan, chain)` takes
+  `K` in the plan and the splitting randomness (XOR masks, Shamir coefficients) is a PRF of `K`:
+  `HMAC-SHA256(K, "CRT/v1/split" ‖ I ‖ u32 BE counter)` (`splitRng`, `deriveLeafSecrets`). `wrapKey` re-derives the
+  shares, refuses if they do not reproduce the descriptor's commitments ("K does not match"), and uses `rng` only for
+  ephemeral keys and nonces. Client-side only; other clients may split however they like (the commitments say what to expect).
+- 2026-11-15 — `buildDescriptor(plan, chain)` is pure: `chain = {T, deployment, aliveCell, nodeCells}` (the shapes returned
+  by `verifyNodes`/`readSwitch`); it requires exactly one state-1 Node Cell with a valid point per planned runner.
+  `buildVerifiedDescriptor(plan, T, ctx)` runs the SPEC §8.3 verification first; `wrapKeyAnchored(K, d, ctx)` refuses
+  unless verification passes and every Node Cell already carries `descriptorHash(d)` (SPEC §6 "no wrap to an unanchored
+  descriptor"). Both live in `kit/anchored.ts` so the kit bundle does not pull chain verification code.
+- 2026-11-15 — `validateDescriptor` mirrors `client/schema/descriptor.schema.json` (JSON Schema 2020-12, `additionalProperties:
+  false`, lowercase `0x` hex, integers only) plus semantic rules (identity = I(network_id, type_id), supported tree whose
+  leaves index `nodes`, one commitment per leaf, unique runners and Node Cells). Curve membership of `pubkey` is **not** a
+  schema/validation rule because the shared vector uses placeholder keys; `buildDescriptor` and `wrap` check it. Tests use
+  `ajv` 8 (devDependency only) to check the schema against the vector and the same mutations as `validateDescriptor`.
+- 2026-11-15 — Envelopes are `{position, node, runner_lock_hash, envelope: 0x hex}` (one per leaf, `aad = I ‖ u16 BE
+  position`); `unwrapAll` also accepts a plain hex array indexed by position. `unwrapAll(descriptor, envelopes, releases)`
+  returns `K` or throws `RecoveryError` whose message carries the headroom ("threshold headroom -1, mandatory headroom 0;
+  branch 0: 4 of 5 required …") and every bad leaf; `unwrapAllReport` returns the per-leaf report (`ok`, `no-release`,
+  `bad-privkey`, `missing-envelope`, `unwrap-failed`, `commitment-mismatch`) without throwing. Mandatory branch for the
+  headroom split = phase-1 default (smallest branch).
+- 2026-11-15 — `collectReleases(T, rpcUrls, {nodeLockCodeHash, fetch?})`: the third argument is needed because the lock code
+  hash is not derivable from `T`. Only **live** Node Cells in state 2 are read (no history scan in v0.1), and a release is
+  kept only if `pubkey(privkey)` equals the cell's pubkey. `recoverOffline(descriptor, envelopes, pasted[])` accepts bare
+  private keys (matched to nodes by pubkey), `R:privkey`, or raw state-2 Node Cell data; `recoverOnline` is the chain variant.
+- 2026-11-15 — Kit bundling: `scripts/build-kit.mjs` bundles `kit/recovery.ts` with **esbuild 0.28.2** (pinned devDependency,
+  the version `tsx` already ships; IIFE, minified, legal comments kept at the end) and writes `src/kit/assets.generated.ts`
+  (template + bundle as string constants, checked in) so `generateKit` needs no file access and works in browsers. Test
+  `kit_assets_up_to_date` rebuilds in memory and compares; `npm run build` regenerates first. Bundle ≈ 37 KB.
+- 2026-11-15 — `generateKit({descriptor, envelopes, application?, kitVersion, deadline?, rpcUrls?})`: `kitVersion` must equal
+  `KIT_VERSION` ("1"), so same version + same inputs ⇒ same bytes; embedded JSON has sorted keys (input key order does not
+  matter) and `<`/`>`/`&` escaped. The deadline is not in the descriptor (renewals move it), so it is an optional input
+  printed as "at kit generation". Pre-filled RPC list: `https://mainnet.ckb.dev/`, `https://testnet.ckb.dev/`,
+  `http://127.0.0.1:8114/` per network, editable in the page. `application.script` is inlined after the kit script
+  (rejected if it contains `</script`); `window.CRT_KIT = {version, descriptor, envelopes, application, api}`.
+- 2026-11-15 — A test runs the generated page's scripts in `node:vm` with a minimal DOM stub: banner MATCH (MISMATCH after
+  editing the embedded descriptor), `CRT_KIT.api.recover(pasted)` returns `K` and calls `crtApplication.onKey`. No browser
+  is available, so the real DOM wiring (buttons) is only type-checked.
+
 ### Phase 3 — transaction builders
 
 - 2026-11-15 — `@ckb-ccc/core` 1.23 added as the third runtime dependency. All chain reads of the builders go through
