@@ -215,19 +215,17 @@ built like CSR's `services/rust/*`). Its data hash is `CRT_CODE_HASH`, published
 **service manifest** with empty args (so it appears in every runner's catalog with name, description and links;
 nothing posts jobs to that generic ID).
 
-A runner enables CRT with a **local manifest** whose `args` is its own `R`:
+A runner enables CRT with an **on-chain manifest** whose `args` is its own `R`. CSR derives the service ID from the
+code hash, the args and the data cells only for on-chain manifests (a local manifest registers the bare code hash, so
+job cells addressed to one runner would never match; verified on devnet). The publisher binding of CSR requires the
+manifest lock to equal the code cell's lock, so the owner of the CRT code cell (the CRT operator) publishes one manifest
+per runner with `scripts/crt-publish.sh` (`csr service publish --code-outpoint … --data-outpoint <deployment data cell>
+--args R`) and lists it in `deployments/<network>-manifests/<R>.json`.
 
-```toml
-name = "crt"
-language = "rust"
-elf = "crt-service.elf"       # the released binary, data hash CRT_CODE_HASH
-args = "0x<R, 32 bytes>"
-```
-
-`scripts/crt-enable.sh` (operators, `docs/operators.md`) reads `R` from the runner, writes this file, runs
-`csr service add-local --manifest … && csr service approve … && csr service enable …` and prints the runner's
-**CRT service ID** = `blake2b256("CSR-SERVICE-v1" ‖ CRT_CODE_HASH ‖ u32 LE 32 ‖ R ‖ 0x00)`. Clients compute the
-same from the registry cell; nothing has to be published by the operator.
+`scripts/crt-enable.sh` (runner admins, `docs/operators.md`) reads `R` from the runner, finds that file, runs
+`csr service add-onchain --manifest <out point> --approve && csr service enable <service ID>` and prints the runner's
+**CRT service ID** = `blake2b256("CSR-SERVICE-v1" ‖ CRT_CODE_HASH ‖ u32 LE 32 ‖ R ‖ 0x01 ‖ data hash of the deployment
+data cell)`. Clients compute the same from the registry cell and the deployment file.
 
 ### 5.2 Inputs of a run
 

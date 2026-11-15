@@ -54,25 +54,39 @@ curl -fLO https://raw.githubusercontent.com/psawyerberlin/ckb-revocable-timelock
 sudo -u csr bash crt-enable.sh --network testnet
 ```
 
-What it does (see `scripts/crt-enable.sh`; `--dry-run` shows without changing anything):
+CSR keys a service by its code hash, its args and its data cells only when it comes from an **on-chain manifest**. CRT
+needs jobs addressed to *your* runner, so the service args are your runner lock hash `R`, and the CRT operator
+publishes one manifest per runner (`scripts/crt-publish.sh`, run with the deployer key, because only the owner of the
+code cell can publish a manifest for it). The script then does, on your side (`--dry-run` shows without changing anything):
 
 1. reads your runner lock hash `R` from the running CSR instance;
-2. downloads the released `crt-service.elf` and checks its SHA-256 against the release's `SHA256SUMS`;
-3. writes a local manifest with `args = R` (this is what makes CRT jobs addressed to *you*, not to any runner —
-   `SPEC.md` §3.3) and the CRT deployment data cell;
-4. `csr service add-local`, `approve`, `enable`;
-5. prints your **CRT service ID** and the dashboard link.
+2. finds the manifest the operator published for `R` (`deployments/<network>-manifests/<R>.json` in this repository);
+   if there is none yet, it prints your `R`, which you send to the operator, and stops;
+3. `csr service add-onchain --manifest <out point> --approve` and `csr service enable <service ID>`; the service code
+   runs from the code cell on chain, nothing is downloaded;
+4. prints your **CRT service ID** and the dashboard link.
 
 Expected output (abridged; `--dry-run` prints the same steps prefixed `[dry-run]`):
 
 ```text
-CRT service ID: 0x<64 hex>
 Runner lock hash R: 0x<64 hex>
-Check the Jobs page of your dashboard (http://127.0.0.1:8114 by default; see csr.toml [dashboard].bind) for CRT jobs.
+CRT service ID: 0x<64 hex>
+Check the Jobs page of your dashboard (see csr.toml [dashboard].bind) for CRT jobs.
 ```
 
-Options: `--network testnet|mainnet` (required), `--dry-run`, `--runner-lock-hash 0x…` (override the value read from
-the running CSR). The script refuses to continue if the ELF's SHA-256 differs from the release's `SHA256SUMS`.
+Options: `--network testnet|mainnet`, `--dry-run`, `--runner-lock-hash 0x…` (override the value read from the running
+CSR), `--manifest FILE` (use this manifest file instead of looking it up).
+
+### For the CRT operator
+
+```sh
+bash scripts/crt-publish.sh --key-file ~/keys/crt-testnet.key --csr /path/to/csr --dry-run
+bash scripts/crt-publish.sh --key-file ~/keys/crt-testnet.key --csr /path/to/csr --runner-lock-hash 0x<R> [--runner-lock-hash …]
+git add deployments && git commit -m "CRT manifests" && git push
+```
+
+The first run also deploys the service ELF as a code cell (its size in CKB is locked, recoverable with the key). The
+ELF's data hash must equal `crt_code_hash` in `deployments/<network>.json`.
 
 Your service ID is derived from public data (`CRT_CODE_HASH`, your `R`, the deployment data hash), so you do not
 have to publish anything. To be listed in the client's runner directory, open a pull request adding your runner to

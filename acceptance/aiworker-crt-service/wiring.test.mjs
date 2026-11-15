@@ -55,13 +55,13 @@ test('phase 3: build script, manifest template, enable/disable scripts', () => {
   assert.match(read('service', 'manifests', 'crt-local.toml.in'), /@R@/);
   const en = read('scripts', 'crt-enable.sh');
   assert.match(en, /set -euo pipefail/);
-  assert.match(en, /add-local/);
+  assert.match(en, /add-onchain/); // on-chain manifest per runner (devnet run, 2026-11); add-local only registers the bare code hash
   assert.match(en, /approve/);
   assert.match(en, /enable/);
   assert.match(en, /--dry-run/);
   assert.match(en, /--network/);
   assert.match(en, /CSR-SERVICE-v1|service ID|service_id/i);
-  assert.match(en, /sha256|SHA256SUMS/);
+  assert.match(en, /manifest_outpoint/);
   const dis = read('scripts', 'crt-disable.sh');
   assert.match(dis, /disable/);
   assert.match(dis, /revoke/);
