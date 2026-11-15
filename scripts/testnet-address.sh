@@ -51,7 +51,7 @@ body = json.dumps({"id": 1, "jsonrpc": "2.0", "method": "get_cells_capacity", "p
     "script": {"code_hash": "0x" + code_hash, "hash_type": "type", "args": "0x" + args.removeprefix("0x")},
     "script_type": "lock"}]}).encode()
 try:
-    r = json.load(urllib.request.urlopen(urllib.request.Request(rpc, body, {"Content-Type": "application/json"}), timeout=30))
+    r = json.load(urllib.request.urlopen(urllib.request.Request(rpc, body, {"Content-Type": "application/json", "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) crt-tools"}), timeout=30))
     cap = int(r["result"]["capacity"], 16)
     print(f"balance: {cap / 1e8:,.2f} CKB (needs about 53,000)")
 except Exception as e:
