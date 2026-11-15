@@ -82,10 +82,9 @@ NODE_LOCK_TX=$(json tx_hash < "$STATE/node-lock-deploy.json")
 $DEVNET mine 3 >/dev/null
 log "crt-node-lock deployed ($NODE_LOCK_HASH)"
 
-# 3. publish the generic CRT manifest (deployment data cell + service ELF code cell)
+# 3. deploy the service ELF as a code cell (csr-dev deploy-service has no --manifest; runners use a local manifest, see 5.)
 if [ ! -f "$STATE/service-deploy.json" ]; then
-  "$CSR_DEV" --rpc "$RPC" --json deploy-service --elf "$ELF" --manifest "$ROOT/service/manifests/crt-local.toml.in" \
-    > "$STATE/service-deploy.json.tmp"
+  "$CSR_DEV" --rpc "$RPC" --json deploy-service --elf "$ELF" > "$STATE/service-deploy.json.tmp"
   mv "$STATE/service-deploy.json.tmp" "$STATE/service-deploy.json"
   $DEVNET mine 3 >/dev/null
 fi
