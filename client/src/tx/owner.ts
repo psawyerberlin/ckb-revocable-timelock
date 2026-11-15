@@ -71,7 +71,7 @@ export async function buildArm(T: string, descriptorHash: string | Uint8Array, c
   const missing = nodes.filter((n) => !jobs.some((j) => j.R === n.R && j.job.trigger.kind === 'Every'));
   if (missing.length) {
     const p: SwitchParams = { ...defaultSwitchParams(), ...currentHeartbeatParams(jobs), ...ctx.params, organiserFee: 0n };
-    validateSwitchParams(p, { termSeconds: Number(deadline - at.now) });
+    validateSwitchParams(p, { networkId: d.network_id, termSeconds: Number(deadline - at.now) });
     for (const n of missing) {
       const o = jobOutput(d, n.R, heartbeatJob(t, p, at, deadline, blockSecondsOf(ctx), ownerLockHash));
       tx.addOutput(o.cellOutput, o.outputData);
@@ -96,7 +96,7 @@ export async function buildRenew(T: string, newDeadline: bigint | number, params
   if (merged.heartbeatBlocks === undefined || merged.heartbeatTip === undefined || merged.maxFee === undefined)
     throw new TxBuildError('no live heartbeat job to take the parameters from; pass them explicitly');
   const p: SwitchParams = { ...defaultSwitchParams(), ...(merged as HeartbeatParams) };
-  validateSwitchParams(p, { termSeconds: Number(deadline - at.now) });
+  validateSwitchParams(p, { networkId: d.network_id, termSeconds: Number(deadline - at.now) });
 
   const tx = ccc.Transaction.from({});
   for (const n of nodes) addNodeUpdate(tx, n, { deadline });

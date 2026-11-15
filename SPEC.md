@@ -349,7 +349,7 @@ Everything the owner decides at Create, each with a default, all shown on one sc
 
 | Parameter | Default | Range | What it trades |
 |---|---|---|---|
-| `deadline` / term | — | ≥ 1 day; warning > 5 years | duration risk (§10) |
+| `deadline` / term | — | ≥ 1 day (≥ 30 min on testnet and devnet, client check only, for rehearsals); warning > 5 years | duration risk (§10) |
 | `n`, `t` | 8, 5 | `n` 3–16 (1–16 on testnet and devnet, `network_id` 1 and 2, where few runners exist), `1 ≤ t ≤ n`; warning `n < 5` | security vs cost: each runner costs its tips and its cells |
 | mandatory set `j`-of-`m` | none | any subset of the `n`; `1-of-1` on > 1 year needs typed acknowledgement | harder to steal vs easier to lose, one for one |
 | `HEARTBEAT` | 8 000 blocks | 1 000–60 000 | **detection delay vs cost**: a missing runner is noticed after ≈ 3 × `HEARTBEAT`; cost scales with `1 / HEARTBEAT` |

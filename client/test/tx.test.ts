@@ -226,7 +226,8 @@ test('build_create_validates_params', async () => {
   await assert.rejects(buildCreate({ ...base, params: { ...PARAMS, heartbeatBlocks: 500 } }), SwitchParamsError);
   await assert.rejects(buildCreate({ ...base, params: { ...PARAMS, heartbeatTip: CKB / 20n } }), SwitchParamsError);
   await assert.rejects(buildCreate({ ...base, deployment: { ...deployment, network_id: 0 }, runners: base.runners.slice(0, 2), params: PARAMS }), SwitchParamsError); // mainnet: n >= 3
-  await assert.rejects(buildCreate({ ...base, deadline: NOW + 3600n, params: PARAMS }), SwitchParamsError);
+  await assert.rejects(buildCreate({ ...base, deadline: NOW + 1200n, params: PARAMS }), SwitchParamsError); // test networks: term >= 30 min
+  await assert.rejects(buildCreate({ ...base, deployment: { ...deployment, network_id: 0 }, deadline: NOW + 3600n, params: PARAMS }), SwitchParamsError); // mainnet: term >= 1 day
   await assert.rejects(buildCreate({ ...base, params: { ...PARAMS, organiserFee: 10n * CKB } }), TxBuildError); // no organiser lock
   const dup = [...base.runners.slice(0, 4), base.runners[0]!];
   await assert.rejects(buildCreate({ ...base, runners: dup, params: PARAMS }), TxBuildError);

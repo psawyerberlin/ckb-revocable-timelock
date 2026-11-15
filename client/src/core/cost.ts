@@ -12,7 +12,8 @@ export const SWITCH_PARAM_RANGES = {
   keygenTip: { min: CKB / 2n, default: CKB },
   maxFee: { min: 0n, default: CKB / 500n },
   organiserFee: { min: 0n, default: 50n * CKB },
-  termSeconds: { min: SECONDS_PER_DAY, warnAbove: 5 * 365 * SECONDS_PER_DAY },
+  /** `minTestNetworks` (30 min) applies to testnet and devnet only, for short rehearsals; mainnet keeps 1 day */
+  termSeconds: { min: SECONDS_PER_DAY, minTestNetworks: 30 * 60, warnAbove: 5 * 365 * SECONDS_PER_DAY },
   /** a 1-of-1 mandatory branch on a term longer than this needs a typed acknowledgement */
   oneOfOneMandatoryTermSeconds: 365 * SECONDS_PER_DAY,
 } as const;
@@ -59,7 +60,9 @@ export function validateSwitchParams(p: SwitchParams, ctx: SwitchParamsContext =
     if (ctx.t !== undefined && (!Number.isInteger(ctx.t) || ctx.t < 1 || ctx.t > ctx.n)) errors.push('t must satisfy 1 <= t <= n');
   }
   if (ctx.termSeconds !== undefined) {
-    if (ctx.termSeconds < R.termSeconds.min) errors.push('term must be at least 1 day');
+    const testNet = ctx.networkId === 1 || ctx.networkId === 2;
+    const minTerm = testNet ? R.termSeconds.minTestNetworks : R.termSeconds.min;
+    if (ctx.termSeconds < minTerm) errors.push(testNet ? 'term must be at least 30 minutes' : 'term must be at least 1 day');
     else if (ctx.termSeconds > R.termSeconds.warnAbove) warnings.push('term longer than 5 years: duration risk (SPEC §10)');
   }
   if (ctx.mandatory) {

@@ -154,6 +154,12 @@ test('switch_params_ranges', () => {
   assert.throws(() => validateSwitchParams(ok, { n: 17 }));
   assert.throws(() => validateSwitchParams(ok, { n: 8, t: 9 }));
   assert.throws(() => validateSwitchParams(ok, { termSeconds: 86_399 }));
+  // testnet and devnet: 30 minutes minimum (rehearsals); mainnet and unset network keep 1 day
+  for (const networkId of [1, 2]) {
+    assert.doesNotThrow(() => validateSwitchParams(ok, { networkId, termSeconds: 1_800 }));
+    assert.throws(() => validateSwitchParams(ok, { networkId, termSeconds: 1_799 }));
+  }
+  assert.throws(() => validateSwitchParams(ok, { networkId: 0, termSeconds: 1_800 }));
   assert.equal(validateSwitchParams(ok, { n: 4, t: 3 }).length, 1); // n < 5 warning
   // n = 1 is allowed on testnet (1) and devnet (2) only; mainnet (0) and an unset network keep the minimum of 3
   assert.equal(validateSwitchParams(ok, { networkId: 1, n: 1, t: 1 }).length, 1);

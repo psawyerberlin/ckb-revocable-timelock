@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- `@crt/client`: minimum term 30 minutes on testnet and devnet (client check, like `n`; mainnet keeps 1 day) for short
+  rehearsals such as the dead-man-switch fire drill; Arm and Renew validate with the deployment's network. `GRACE` stays 24 h.
+- `deployments/testnet-runners.json`: first entry (pswsl).
+
 - `crt-web` (`web/`), phases 1–4: Vite app at `/app/` with network switch and CCC wallet; create flow Deadline → Runners → Quote →
   Create → Arm → Kit (duration risk, runner directory and coalition summary, live cost quote, hard-fail verification, kit download); My switches and Recover; vitest suite, external-reference check, `docs/web.md`.
 
