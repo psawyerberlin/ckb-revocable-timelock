@@ -10,7 +10,9 @@ what was chosen and why. Protocol-changing decisions are also proposed as a `SPE
 - `scripts/devnet-scenario.mjs` ran end to end on a fresh devnet with 4 runners: ALL PASS, 8/8 steps
   (precondition, create, commits + verify rule 1, arm + kit + wrap, renew, release after deadline + GRACE with key
   recovery, cancel with deletions.log +1 per runner, rewrap with runner 3 dropped and runner 4 added).
-- Measured cycles: hold 444,915; keygen 4,985,680 (median 4,985,192); release 2,728,057 (median 2,727,813).
+- Contract review: the node path now rejects a type script on the output Node Cell (error 14), SPEC 4.2/4.3. The devnet run was repeated with the rebuilt contract (data hash 0xaa2fa626aa8418d966e42fe9403731b96276eaff8d1ff50aedea210711143dfb), ALL PASS 8/8, contract tests 25/25.
+- `n` may be 1-16 on testnet and devnet (network_id 1, 2) because few runners exist there; mainnet keeps 3-16 (client check only).
+- Measured cycles: hold 444,915; keygen 4,986,408 (median 4,986,016); release 2,728,225 (median 2,728,076).
   Create -> all commits 7.7 s. The 70M per-job limit leaves a margin of more than 10x.
 - The scenario needs four runners: dropping one of three would leave n=2, below the client minimum of 3.
 

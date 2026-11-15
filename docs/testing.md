@@ -15,12 +15,12 @@ number of failed steps.
 
 ## Measured numbers
 
-Devnet run of 2026-11-15 (CSR v0.6.1, 4 runners, `bash scripts/devnet-e2e.sh --runners 4`): ALL PASS, 8/8 steps.
+Devnet run of 2026-11-15, repeated after the error-14 contract fix (data hash 0xaa2fa626...3dfb; CSR v0.6.1, 4 runners, `bash scripts/devnet-e2e.sh --runners 4`): ALL PASS, 8/8 steps.
 
 | branch  | cycles |
 |---------|--------|
 | hold    | 444915 (max of 6, median 444915) |
-| keygen  | 4985680 (max of 3, median 4985192) |
-| release | 2728057 (max of 5, median 2727813) |
+| keygen  | 4986408 (max of 4, median 4986016) |
+| release | 2728225 (max of 5, median 2728076) |
 
 Wall-clock Create -> all commits: 7.7 s. All branches are far below `limits.max_cycles_per_job` (70,000,000).
