@@ -1,0 +1,7 @@
+{
+ "description": "HKDF step of CRT-ENV-v1: key = HKDF-SHA256(ikm=s, salt=\"CRT-ENV-v1\", info=E||P, L=32). Worker-generated.",
+ "s": "0xeb6e96d39e68721f79886ae03d5be0903ebf6fa270b87342b6961ecb791f0f8d",
+ "E": "0x0259985e15f91d5c9e770a1540459ab643fe646b73648abbbb65a13ad0539658e9",
+ "P": "0x0284bf7562262bbd6940085748f3be6afa52ae317155181ece31b66351ccffa4b0",
+ "key": "0x77c1e30de9e2160ae062866a788abd2861c2dca49ea581db8089c2a80dc39544"
+}

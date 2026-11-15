@@ -4,6 +4,40 @@ Newest spec first. One `##` section per spec, one bullet per decision: what was 
 what was chosen and why. Protocol-changing decisions are also proposed as a `SPEC.md` diff in the PR body
 (`AIWORKER.md` §5).
 
+## Spec 03 — `crt-client` (`aiworker/03-crt-client.md`)
+
+### Phase 1 — primitives
+
+- 2026-11-15 — Test runner: `node:test` through `tsx` (`tsx --test --test-reporter=tap`); TAP output is explicit so the
+  acceptance regex (`ok N - name`) matches regardless of the Node default reporter. No vitest.
+- 2026-11-15 — Runtime deps only `@noble/secp256k1` 2.x and `@noble/hashes` 1.x for now (`@ckb-ccc/core` is added in phase 3).
+  Sources import with `.ts` extensions; the build uses `rewriteRelativeImportExtensions`.
+- 2026-11-15 — `wrap`/`unwrap` are `async` (WebCrypto). Byte inputs are `Uint8Array`; hashes and cell fields that are
+  already hex in the descriptor/vectors are `0x` hex strings in `NodeCellData`; `identity`/`shareCommitment`/`jobPayload`
+  accept bytes or hex and return bytes.
+- 2026-11-15 — `client/test/kat-hkdf.json` generated from fixed `d = 01..20`, `e = a0..bf`; the key was re-derived
+  independently with Python `hmac` and matches.
+- 2026-11-15 — `vendor/csr-job.mjs` is CSR v0.6.1 (`dace9b7`) `sdk/js/csr-job.mjs` with one header comment line
+  prepended naming the tag; `csr-job.sha256` is the hash of that file as vendored.
+- 2026-11-15 — Cost estimator: SPEC §11.1 says `block_seconds` is 10 s by default, but its reference table (8 000 blocks
+  ≈ 1 day, 365 runs, ≈ 1 530 CKB) only holds at 86 400 / 8 000 = 10.8 s (at 10 s there would be 395 runs, ≈ 1 645 CKB,
+  outside the ±2 % of `cost_estimate_defaults`). Default is therefore `DEFAULT_BLOCK_SECONDS = 10.8`, overridable per
+  deployment (`deployment.blockSeconds`). `runs` subtracts 1e-9 before `ceil` to ignore float noise on exact multiples.
+  `spentOverTerm` includes organiser fee and network fees (the table's "Spent" row); `spentNow` is organiser + network fees.
+  Network fees default to 1 CKB in total. Job-cell occupied capacity is computed from the molecule `Job` layout
+  (heartbeat 165 data bytes → 303 CKB, keygen 153 → 291 CKB); node cell 244 CKB, alive cell 65 CKB (53-byte lock).
+- 2026-11-15 — Amounts are bigint shannons in, `number` CKB out. `validateSwitchParams(params, ctx?)` throws
+  `SwitchParamsError` (with `.errors`) and returns warnings (n < 5, term > 5 years). A 1-of-1 mandatory node on a term
+  > 1 year is an error unless `ctx.acknowledgedOneOfOne`. `SwitchParams` uses the names of §6.2 (`heartbeatBlocks`,
+  `heartbeatTip`, `keygenTip`, `maxFee`, `organiserFee`).
+- 2026-11-15 — Access trees: `threshold` and `xor` of ≥ 2 `threshold` branches; nesting and leaf-only branches rejected;
+  a node may not appear twice inside one threshold. `splitKey` shares the XOR branch secrets (last = K ⊕ others) with
+  Shamir; commitments are per leaf. `combineKey` uses the first `t` available shares per branch and does not check
+  commitments (callers do). `headroom` for `xor`: the mandatory branch is `opts.mandatoryBranch` or, by default, the
+  branch with the fewest leaves (last on ties); `threshold` headroom is the minimum over the other branches; a plain
+  threshold tree has `mandatory: null`.
+- 2026-11-15 — `parseResult` accepts `"CRT1" ‖ status` with or without the trailing 32-byte `T`.
+
 ## Spec 01 — `crt-contracts` (`aiworker/01-crt-contracts.md`)
 
 ### Phase 5 — documentation
