@@ -5,7 +5,7 @@ use core::ops::Range;
 
 /// `hash_type` bytes.
 pub const HASH_TYPE_TYPE: u8 = 1;
-pub const HASH_TYPE_DATA2: u8 = 2;
+pub const HASH_TYPE_DATA2: u8 = 4; // CKB molecule encoding: data 0, type 1, data1 2, data2 4
 /// `dep_type` code.
 pub const DEP_TYPE_CODE: u8 = 0;
 
@@ -106,5 +106,21 @@ impl Skeleton {
         ]);
         let witnesses = table(&[&bytes(&[])]);
         table(&[&raw, &witnesses])
+    }
+}
+
+#[cfg(test)]
+mod hash_type_tests {
+    use super::*;
+
+    /// The mock chain of the unit tests uses these constants on both sides, so a wrong value passes everywhere
+    /// except on a real node (devnet run: `2` is `data1`, the Node Cell query found nothing and every run
+    /// reported `dropped`). CKB's molecule `Script.hash_type` bytes: data 0, type 1, data1 2, data2 4.
+    #[test]
+    fn hash_type_bytes_match_ckb() {
+        assert_eq!(HASH_TYPE_TYPE, 1);
+        assert_eq!(HASH_TYPE_DATA2, 4);
+        let s = script(&[0u8; 32], HASH_TYPE_DATA2, &[0xaa; 64]);
+        assert_eq!(s[4 * 4 + 32], 4, "hash_type byte inside the molecule Script");
     }
 }
