@@ -6,6 +6,19 @@ what was chosen and why. Protocol-changing decisions are also proposed as a `SPE
 
 ## Spec 02 — `crt-service` (`aiworker/02-crt-service.md`)
 
+### Phase 4 — devnet smoke script (written, not run)
+
+- `scripts/devnet-service-smoke.sh` (`--help`, `bash -n` clean) and `scripts/devnet/crt-smoke.mjs` (plain JSON-RPC:
+  tip, mine-to, node-state, cell-live, send, owner-lock-hash) with `csr-job.mjs` copied from CSR v0.6.1. Nothing was
+  run: no devnet here; PASS output is not pasted (per task instructions).
+- **Switch creation is pluggable.** `client/` does not exist yet and hand-building the create transaction needs
+  signing details only checkable on a devnet, so the script takes `--create-switch CMD` (default
+  `client/scripts/devnet-create-switch.mjs` if present) that prints `<T> <deadline>` and supports `--consume-alive T`.
+  Wiring this up is part of the crt-devnet-e2e manual phase, as are the `csr-dev`/`csr` flags used (taken from CSR
+  docs/testing.md, unverified against a live build).
+- Clock advance: `mine-to` mines in batches via `devnet.sh mine` until the tip timestamp reaches
+  `deadline + GRACE + 60`; this needs a devnet that can mine with future timestamps, to be confirmed in the manual phase.
+
 ### Phase 3 — binary, manifest, enable script
 
 - 2026-11-15 — `main.rs` was already wired to `run()` in phase 2. `scripts/build-service.sh` mirrors
