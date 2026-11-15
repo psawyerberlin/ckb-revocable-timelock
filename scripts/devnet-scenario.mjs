@@ -117,7 +117,8 @@ const ownerKey = opt.key || JSON.parse(readFileSync(resolve(ROOT, '.refs/csr/dev
 const signer = new ccc.SignerCkbPrivateKey(cccClient, ownerKey);
 const ctx = { signer, deployment };
 const rpcClient = new crt.RpcClient(opt.rpc);
-const runnerInfo = [1, 2, 3, 4].slice(0, opt.runners).map((i) => JSON.parse(readFileSync(resolve(runnerDir(i), 'crt/runner.json'), 'utf8')));
+// runner identity: `<runner dir>/csr` is the wrapper devnet-e2e.sh writes (pins --data-root and --config)
+const runnerInfo = [1, 2, 3, 4].slice(0, opt.runners).map((i) => JSON.parse(execFileSync(resolve(runnerDir(i), 'csr'), ['identity', '--json'], { encoding: 'utf8' })));
 const sw = { runners: runnerInfo.map((r) => ({ R: r.R ?? r.runner_lock_hash, servicePubkey: r.service_pubkey })) };
 
 async function send(tx) { const h = await signer.sendTransaction(tx); smoke('mine-to', String(await tipSeconds() + 1)); return h; }
