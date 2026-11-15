@@ -23,7 +23,7 @@ export interface TxContext {
 }
 
 /** CSR job defaults that SPEC §3.3 fixes but that are not switch parameters. */
-export const JOB_MAX_CYCLES = 100_000_000n;
+export const JOB_MAX_CYCLES = 70_000_000n; // CSR runners skip jobs above their max_cycles_per_job, default 70 M
 /** `expiry_block` margin after the last expected run (≈ 7 days, SPEC §3.3). */
 export const JOB_EXPIRY_MARGIN_SECONDS = 7 * SECONDS_PER_DAY;
 export const ZERO32 = '0x' + '00'.repeat(32);

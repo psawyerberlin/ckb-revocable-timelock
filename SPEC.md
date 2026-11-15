@@ -134,7 +134,7 @@ Standard CSR job cells (`ckb-service-runner/spec/job-cell-standard.md`), built w
 | `payload` | `"CRTS" ‖ 0x01 ‖ T` (37 bytes) | same |
 | `tip_shannons` | `KEYGEN_TIP` (default 1 CKB) | `HEARTBEAT_TIP` (default 0.5 CKB) |
 | `max_fee_shannons` | default 0.002 CKB | same |
-| `max_cycles` | measured on devnet, default 100 M | same |
+| `max_cycles` | measured on devnet, default 70 M (the CSR runners' default limit; a job above it is skipped) | same |
 | `expiry_block` | creation + ≈ 7 days | end of term + ≈ 7 days |
 | `refund_lock_hash` | owner lock hash | owner lock hash |
 
@@ -284,7 +284,7 @@ Rules:
 ### 5.4 Cycle budget
 
 Measured on devnet (phase 05). Expected: HOLD < 2 M cycles; KEYGEN/RELEASE ≈ 10–40 M (one scalar
-multiplication with `k256`, no_std). `max_cycles` of the job cells defaults to 100 M with that headroom.
+multiplication with `k256`, no_std). `max_cycles` of the job cells defaults to 70 M, the default `max_cycles_per_job` of CSR runners (a job asking for more is skipped); the devnet run measures what the service needs.
 
 ### 5.5 Deployment data cell
 

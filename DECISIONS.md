@@ -162,7 +162,7 @@ what was chosen and why. Protocol-changing decisions are also proposed as a `SPE
 - 2026-11-15 — Heartbeat job term = `deadline + GRACE − now` (so the release run is covered); `remainingRuns =
   ceil(term_blocks / HEARTBEAT)` with `term_blocks = term / block_seconds` (10.8 s default as in the cost estimator,
   same epsilon); `expiry_block = tip + runs × HEARTBEAT + 7 days of blocks`; keygen `expiry_block = tip + 7 days`.
-  `max_cycles` 100 M. "now" is the tip header timestamp unless `ctx.now` is given. Job cells use exactly
+  `max_cycles` 70 M (CSR runner default limit). "now" is the tip header timestamp unless `ctx.now` is given. Job cells use exactly
   `minJobCapacity` (`jobCell` of csr-job.mjs).
 - 2026-11-15 — Create: output 0 Alive Cell (owner lock, type-id, occupied capacity), outputs 1..n Node Cells (244 CKB with
   a 64-byte-args data2 lock), then keygen jobs, then the organiser fee output (only if `organiserFee > 0`; needs
