@@ -160,6 +160,14 @@ const committed = (T) => async () => (await crt.readSwitch(T, swCtx)).state === 
 /** verify -> descriptor -> Arm; returns the descriptor */
 async function armSwitch(sw, K) {
   const descriptor = await crt.buildVerifiedDescriptor({ K, access_tree: tree2of3, nodes: planNodes(), created_at: Math.floor(Date.now() / 1000) }, sw.T, swCtx);
+  // Arm reads the Node Cells through the owner's CCC client, verify through RpcClient: wait until both agree, and
+  // report what each sees when they do not
+  const views = async () => ({
+    owner: (await crt.liveNodeCells(sw.T, ctx)).map((n) => `${n.R.slice(0, 10)}:state${n.data.state}`),
+    rpc: (await crt.readSwitch(sw.T, swCtx)).nodeCells.map((n) => `${n.R.slice(0, 10)}:state${n.data.state}`),
+  });
+  try { await waitFor('owner client sees all Node Cells in state 1', async () => (await crt.liveNodeCells(sw.T, ctx)).every((n) => n.data.state === 1), { timeoutS: 90 }); }
+  catch (e) { throw new Error(`${e.message}; views: ${JSON.stringify(await views())}`); }
   await send(await crt.buildArm(sw.T, crt.descriptorHash(descriptor), { ...ctx, params: { heartbeatBlocks: HB } }));
   await waitFor('armed', async () => (await crt.readSwitch(sw.T, swCtx)).state === 'armed');
   return descriptor;
