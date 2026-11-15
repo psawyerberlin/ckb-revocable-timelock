@@ -4,7 +4,8 @@ export const CKB = SHANNONS_PER_CKB;
 export const SECONDS_PER_DAY = 86_400;
 
 export const SWITCH_PARAM_RANGES = {
-  n: { min: 3, max: 16, default: 8, warnBelow: 5 },
+  /** `min` is the mainnet minimum; `minTestNetworks` applies to testnet (1) and devnet (2), which have few runners */
+  n: { min: 3, minTestNetworks: 1, max: 16, default: 8, warnBelow: 5 },
   t: { default: 5 },
   heartbeatBlocks: { min: 1_000, max: 60_000, default: 8_000 },
   heartbeatTip: { min: CKB / 10n, default: CKB / 2n },
@@ -29,6 +30,8 @@ export class SwitchParamsError extends Error {
 }
 
 export interface SwitchParamsContext {
+  /** `network_id` of the deployment (0 mainnet, 1 testnet, 2 devnet). Anything but 1 or 2 (including unset) gets the mainnet rules. */
+  networkId?: number;
   n?: number;
   t?: number;
   termSeconds?: number;
@@ -50,7 +53,8 @@ export function validateSwitchParams(p: SwitchParams, ctx: SwitchParamsContext =
   if (p.maxFee < R.maxFee.min) errors.push('max fee must be >= 0');
   if (p.organiserFee < R.organiserFee.min) errors.push('organiser fee must be >= 0');
   if (ctx.n !== undefined) {
-    if (!Number.isInteger(ctx.n) || ctx.n < R.n.min || ctx.n > R.n.max) errors.push(`n must be between ${R.n.min} and ${R.n.max}`);
+    const minN = ctx.networkId === 1 || ctx.networkId === 2 ? R.n.minTestNetworks : R.n.min;
+    if (!Number.isInteger(ctx.n) || ctx.n < minN || ctx.n > R.n.max) errors.push(`n must be between ${minN} and ${R.n.max}`);
     else if (ctx.n < R.n.warnBelow) warnings.push('n < 5: few runners means little redundancy or little protection');
     if (ctx.t !== undefined && (!Number.isInteger(ctx.t) || ctx.t < 1 || ctx.t > ctx.n)) errors.push('t must satisfy 1 <= t <= n');
   }

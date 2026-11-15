@@ -155,6 +155,11 @@ test('switch_params_ranges', () => {
   assert.throws(() => validateSwitchParams(ok, { n: 8, t: 9 }));
   assert.throws(() => validateSwitchParams(ok, { termSeconds: 86_399 }));
   assert.equal(validateSwitchParams(ok, { n: 4, t: 3 }).length, 1); // n < 5 warning
+  // n = 1 is allowed on testnet (1) and devnet (2) only; mainnet (0) and an unset network keep the minimum of 3
+  assert.equal(validateSwitchParams(ok, { networkId: 1, n: 1, t: 1 }).length, 1);
+  assert.equal(validateSwitchParams(ok, { networkId: 2, n: 1, t: 1 }).length, 1);
+  assert.throws(() => validateSwitchParams(ok, { networkId: 0, n: 1, t: 1 }), /n must be between 3 and 16/);
+  assert.throws(() => validateSwitchParams(ok, { n: 2, t: 1 }), /n must be between 3 and 16/);
   assert.equal(validateSwitchParams(ok, { n: 8, t: 5, termSeconds: 6 * 365 * 86_400 }).length, 1); // > 5 years warning
   const long = { n: 8, t: 5, termSeconds: 2 * 365 * 86_400, mandatory: { j: 1, m: 1 } };
   assert.throws(() => validateSwitchParams(ok, long), /acknowledgement/);

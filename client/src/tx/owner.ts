@@ -132,7 +132,7 @@ export async function buildRewrap(T: string, dropR: string[], addRunners: Create
   const at = await chainNow(ctx);
   const jobs = await liveJobCells(t, nodes.map((n) => n.R), ctx);
   const p: SwitchParams = { ...defaultSwitchParams(), ...currentHeartbeatParams(jobs), ...ctx.params, organiserFee: 0n };
-  validateSwitchParams(p, { n: kept.length + add.length, termSeconds: Number(deadline - at.now) });
+  validateSwitchParams(p, { networkId: d.network_id, n: kept.length + add.length, termSeconds: Number(deadline - at.now) });
 
   const tx = ccc.Transaction.from({});
   for (const n of nodes.filter((n) => drop.has(n.R))) tx.addInput(inputOf(n.cell));

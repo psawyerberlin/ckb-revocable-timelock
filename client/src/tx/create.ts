@@ -56,7 +56,7 @@ export async function buildCreate(a: BuildCreateArgs): Promise<BuildCreateResult
   const deadline = BigInt(a.deadline);
   const at = await chainNow(ctx);
   const n = a.runners.length;
-  const warnings = validateSwitchParams(a.params, { ...a.validation, n, termSeconds: Number(deadline - at.now) });
+  const warnings = validateSwitchParams(a.params, { ...a.validation, networkId: d.network_id, n, termSeconds: Number(deadline - at.now) });
 
   const Rs = a.runners.map((r, i) => hex32(r.R, `runners[${i}].R`));
   if (new Set(Rs).size !== Rs.length) throw new TxBuildError('a runner appears twice');
