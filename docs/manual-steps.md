@@ -29,6 +29,7 @@ bash scripts/deploy-testnet.sh --key-file /path/to/testnet.key
 git add deployments/testnet.json && git commit -m "Testnet deployment"
 ```
 
-Expected cost: about 20,000 CKB locked as capacity of the code cell (roughly the binary size in bytes plus
-overhead, in CKB) plus fees below 0.01 CKB. The locked CKB is recovered by consuming the cell. The script refuses
+Expected cost: about 52,700 CKB locked as capacity of the code cell (the binary is 52,584 bytes and a cell needs
+1 CKB per byte plus about 100 CKB of overhead) plus the small deployment data cell and fees below 0.01 CKB. Fund the
+deployer with at least 53,000 CKB (testnet CKB comes from the faucet). The locked CKB is recovered by consuming the cell. The script refuses
 to run twice while `deployments/testnet.json` exists.

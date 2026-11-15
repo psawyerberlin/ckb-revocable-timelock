@@ -9,7 +9,7 @@ what was chosen and why. Protocol-changing decisions are also proposed as a `SPE
 
 - `scripts/deploy-testnet.sh`, `deployments/testnet-runners.json` (empty `runners` list with schema comment), `deployments/README.md` and `docs/testing.md` exist; nothing was run against a node.
 - `deploy-testnet.sh` deploys `crt-node-lock` through `csr-dev deploy-service`; it refuses to overwrite `deployments/testnet.json` and `--dry-run` sends and writes nothing. The data cell and manifest are published by the devnet script path; confirm on the manual run.
-- `docs/manual-steps.md` now holds both manual procedures (devnet run, testnet deployment) with the expected cost (~20,000 CKB locked, recoverable).
+- `docs/manual-steps.md` now holds both manual procedures (devnet run, testnet deployment) with the expected cost (~52,700 CKB locked, recoverable; corrected from ~20,000 after checking the 52,584-byte binary).
 - Cycle defaults in `client/src/tx/defaults.ts` and the SPEC §5.4 proposal are left unchanged until real measurements exist.
 
 ## Spec 05 (crt-devnet-e2e), Phase 2: scenario
