@@ -11,14 +11,14 @@ with a CKB node binary, Docker-free, with Rust, Node 22 and Python 3.
 (cd .refs/csr && cargo build -p csr -p csr-dev && bash scripts/build-contracts.sh)
 bash scripts/build-contracts.sh
 bash scripts/build-service.sh
-bash scripts/devnet-e2e.sh --runners 3
+bash scripts/devnet-e2e.sh --runners 4
 (cd client && npm ci) && client/node_modules/.bin/tsx scripts/devnet-scenario.mjs      # prints PASS lines and measured cycles
 bash scripts/devnet-e2e.sh --down
 ```
 
 The scenario moves the chain clock forward (blocks with future timestamps) and refuses to start when the chain clock
 is not within 10 minutes of the wall clock, because the runners idle on a skewed chain. Before every rerun use a fresh
-devnet: `bash scripts/devnet-e2e.sh --reset && bash scripts/devnet-e2e.sh --runners 3`.
+devnet: `bash scripts/devnet-e2e.sh --reset && bash scripts/devnet-e2e.sh --runners 4`.
 
 Paste the PASS output into `DECISIONS.md` and the measured cycles into `docs/testing.md` and
 `client/src/tx/defaults.ts`.

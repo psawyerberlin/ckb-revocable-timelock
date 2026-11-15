@@ -3,7 +3,7 @@
 // Run after `bash scripts/devnet-e2e.sh`:   client/node_modules/.bin/tsx scripts/devnet-scenario.mjs  (after `cd client && npm ci`) [options]
 //   --state DIR     state dir of devnet-e2e.sh (default .devnet/e2e)
 //   --rpc URL       devnet RPC (default http://127.0.0.1:18114)
-//   --runners N     number of runners (default 3)
+//   --runners N     number of runners (default 4: switches use runners 1-3, runner 4 replaces runner 3 in step 7)
 //   --key HEX       owner private key (default: devnet genesis key from CSR checkout, .refs/csr)
 //   --help
 // Steps: 1 create 2-of-3, 2 commits + verify (wrong node_lock hash -> VerificationError rule 1), 3 arm + kit + wrap K,
@@ -22,7 +22,7 @@ import { fileURLToPath } from 'node:url';
 const here = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(here, '..');
 const argv = process.argv.slice(2);
-const opt = { state: resolve(ROOT, '.devnet/e2e'), rpc: 'http://127.0.0.1:18114', runners: 3, key: process.env.CRT_OWNER_KEY ?? '' };
+const opt = { state: resolve(ROOT, '.devnet/e2e'), rpc: 'http://127.0.0.1:18114', runners: 4, key: process.env.CRT_OWNER_KEY ?? '' };
 for (let i = 0; i < argv.length; i++) {
   const a = argv[i];
   if (a === '--help' || a === '-h') {
@@ -92,7 +92,7 @@ async function waitFor(what, fn, { timeoutS = 600, accel = 0 } = {}) {
 const dashPort = (i) => 8130 + i;
 const runnerDir = (i) => resolve(opt.state, `runner${i}`);
 function deletionsLines(i) {
-  const f = resolve(runnerDir(i), 'data/service_data/deletions.log');
+  const f = resolve(runnerDir(i), 'data/devnet/service_data/deletions.log');
   return existsSync(f) ? readFileSync(f, 'utf8').split('\n').filter(Boolean).length : 0;
 }
 const dash = async (i, path) => (await fetch(`http://127.0.0.1:${dashPort(i)}${path}`)).json();
@@ -143,7 +143,8 @@ const swCtx = { rpc: new crt.RpcClient(opt.rpc), deployment };
 // runner identity: `<runner dir>/csr` is the wrapper devnet-e2e.sh writes (pins --data-root and --config)
 const runners = [1, 2, 3, 4].slice(0, opt.runners).map((i) => JSON.parse(execFileSync(resolve(runnerDir(i), 'csr'), ['identity', '--json'], { encoding: 'utf8' })));
 const createRunners = runners.map((r) => ({ R: r.runner_lock_hash, servicePubkey: r.service_pubkey }));
-const planNodes = (rs = runners) => rs.map((r, i) => ({ runner_lock_hash: r.runner_lock_hash, service_pubkey: r.service_pubkey, label: `runner ${i + 1}` }));
+const SWITCH_N = 3; // every switch uses runners 1-3; runner 4 only joins in step 7
+const planNodes = (rs = runners.slice(0, SWITCH_N)) => rs.map((r, i) => ({ runner_lock_hash: r.runner_lock_hash, service_pubkey: r.service_pubkey, label: `runner ${i + 1}` }));
 const tree2of3 = { kind: 'threshold', t: 2, n: 3, leaves: [{ node: 0 }, { node: 1 }, { node: 2 }] };
 const hbParams = () => ({ ...crt.defaultSwitchParams(), heartbeatBlocks: HB });
 
@@ -152,7 +153,7 @@ async function send(tx) { const h = await signer.sendTransaction(tx); await mine
 async function createSwitch(k = 2) {
   // the client measures the term from the tip's timestamp, the contracts from the median: take the later one
   const deadline = Math.max(Math.ceil((await tipMs()) / 1000), await medianSeconds()) + DAY + 600;
-  const built = await crt.buildCreate({ signer, deployment, deadline, runners: createRunners, params: hbParams(), validation: { t: k }, blockSeconds: ACCEL });
+  const built = await crt.buildCreate({ signer, deployment, deadline, runners: createRunners.slice(0, SWITCH_N), params: hbParams(), validation: { t: k }, blockSeconds: ACCEL });
   await send(built.tx);
   return { ...built, deadline };
 }
@@ -177,7 +178,7 @@ const state = {};
 // 0 ---------------------------------------------------------------------------------------------------------------
 await step('0 precondition: the chain clock is within 10 minutes of the wall clock (fresh devnet)', async () => {
   const skew = Math.round((await tipMs()) / 1000 - Date.now() / 1000);
-  assert(Math.abs(skew) < 600, `chain clock is ${skew} s away from the wall clock: the runners idle on a skewed chain. Run: bash scripts/devnet-e2e.sh --reset && bash scripts/devnet-e2e.sh --runners 3`);
+  assert(Math.abs(skew) < 600, `chain clock is ${skew} s away from the wall clock: the runners idle on a skewed chain. Run: bash scripts/devnet-e2e.sh --reset && bash scripts/devnet-e2e.sh --runners 4`);
 });
 
 // 1 ---------------------------------------------------------------------------------------------------------------
@@ -195,7 +196,7 @@ await step('2 wait for 3 commits; verify; wrong node_lock hash -> VerificationEr
   createToCommits = (Date.now() - state.createdAt) / 1000;
   const plan = { type_id: T, nodes: planNodes() };
   const nodes = await crt.verifyNodes(T, plan, swCtx);
-  assert(nodes.length === runners.length, 'verify returned all nodes');
+  assert(nodes.length === SWITCH_N, 'verify returned all nodes');
   const bad = { ...deployment, node_lock: { ...deployment.node_lock, code_hash: '0x' + 'ab'.repeat(32) } };
   let err = null;
   try { await crt.verifyNodes(T, plan, { rpc: swCtx.rpc, deployment: bad }); } catch (e) { err = e; }
@@ -244,10 +245,10 @@ await step('6 second switch: arm, cancel; deletions.log +1 per runner; no releas
   const B = await createSwitch(2);
   await waitFor('commits of B', committed(B.T));
   await armSwitch(B, crypto.getRandomValues(new Uint8Array(32)));
-  const before = runners.map((_, i) => deletionsLines(i + 1));
+  const before = runners.slice(0, SWITCH_N).map((_, i) => deletionsLines(i + 1));
   await send(await crt.buildCancel(B.T, { reclaimNodeCells: false }, ctx));
   // the next heartbeat of every runner sees the consumed Alive Cell and deletes its key
-  await waitFor('deletions.log lines', async () => runners.every((_, i) => deletionsLines(i + 1) >= before[i] + 1), { timeoutS: 300, accel: 100 });
+  await waitFor('deletions.log lines', async () => runners.slice(0, SWITCH_N).every((_, i) => deletionsLines(i + 1) >= before[i] + 1), { timeoutS: 300, accel: 100 });
   await advanceTo(B.deadline + GRACE + 60);
   await mineAccel(1100);
   const rel = await crt.collectReleases(B.T, opt.rpc, { nodeLockCodeHash: deployment.node_lock.code_hash });
@@ -259,7 +260,7 @@ await step('7 rewrap on a third switch: drop runner 3; runner 3 reports dropped'
   const C = await createSwitch(2);
   await waitFor('commits of C', committed(C.T));
   await armSwitch(C, crypto.getRandomValues(new Uint8Array(32)));
-  await send(await crt.buildRewrap(C.T, [createRunners[2].R], [], ctx));
+  await send(await crt.buildRewrap(C.T, [createRunners[2].R], [createRunners[3]], ctx));
   await waitFor('runner 3 dropped', async () => (await allRuns(3)).some((r) => r.status === 6), { timeoutS: 300, accel: 100 });
 });
 
