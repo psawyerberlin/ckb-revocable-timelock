@@ -4,6 +4,17 @@ Newest spec first. One `##` section per spec, one bullet per decision: what was 
 what was chosen and why. Protocol-changing decisions are also proposed as a `SPEC.md` diff in the PR body
 (`AIWORKER.md` §5).
 
+## Spec 04 — `crt-web` (`aiworker/04-crt-web.md`)
+
+### Phase 1 — shell and wallet
+
+- 2026-11-15 — `web/` is a Vite + TypeScript project (no UI framework), `base: '/app/'`, `npm run build` = typecheck, `vite build`, then `scripts/copy-to-site.mjs` replaces `site/app/` with `web/dist/`.
+- 2026-11-15 — Styles: `web/src/style.css` `@import`s `site/assets/site.css` (bundled into the build); dark mode comes from its `prefers-color-scheme` rules.
+- 2026-11-15 — Mainnet option is disabled and the text "CRT is on testnet until CSR's service runtime opens on mainnet" shown while `deployments/mainnet.json` has `"enabled": false` (JSON imported at build time).
+- 2026-11-15 — Wallets: `@ckb-ccc/joy-id` first, then EIP-6963 browser wallets via `@ckb-ccc/eip6963`; the full `@ckb-ccc/ccc` bundle (with its UI) is avoided. Address from `getRecommendedAddress`, balance from `getBalance`.
+- 2026-11-15 — `@crt/client` is not imported yet (nothing in phase 1 needs it); it is wired in with phase 2.
+- 2026-11-15 — Known for phase 4: the CCC bundle contains URLs for `api.ckbccc.com`, `cota.nervina.dev`, `*.ckbapp.dev`; the no-external-requests check must allow-list or strip them.
+
 ## Spec 03 — `crt-client` (`aiworker/03-crt-client.md`)
 
 ### Phase 5 — CLI and documentation
