@@ -90,29 +90,22 @@ if [ ! -f "$STATE/service-deploy.json" ]; then
 fi
 log "generic manifest published"
 
-# 4. deployments/devnet.json (read by crt-enable.sh --network and the client); the type-id code hash is the
-#    devnet's built-in Type ID script.
+# 4. the 102-byte deployment data cell (SPEC.md 5.5), deployed as a cell, and deployments/devnet.json (schema:
+#    client/src/chain/deployment.ts); the type-id code hash is the devnet's built-in Type ID script.
 TYPE_ID_CODE_HASH=0x00000000000000000000000000000000000000000000000000545950455f4944
-python3 -I - "$ROOT/deployments/devnet.json" "$NODE_LOCK_HASH" "$NODE_LOCK_TX" "$TYPE_ID_CODE_HASH" "$STATE/service-deploy.json" <<'PY'
-import json, sys
-out, code_hash, tx, tid, svc = sys.argv[1:6]
-d = {"network": "devnet", "network_id": 2, "enabled": True,
-     "node_lock": {"code_hash": code_hash, "hash_type": "data2", "out_point": {"tx_hash": tx, "index": 0}},
-     "type_id_code_hash": tid, "service": json.load(open(svc))}
-tmp = out + ".tmp"
-open(tmp, "w").write(json.dumps(d, indent=2) + "\n")
-import os; os.replace(tmp, out)
-PY
+DEPLOY_PY="python3 -I $ROOT/scripts/deployment.py"
+$DEPLOY_PY data-bin --network-id 2 --node-lock-json "$STATE/node-lock-deploy.json" --type-id-hash "$TYPE_ID_CODE_HASH" \
+  --out "$STATE/deployment-devnet.bin"
+if [ ! -f "$STATE/data-deploy.json" ]; then
+  "$CSR_DEV" --rpc "$RPC" --json deploy-service --elf "$STATE/deployment-devnet.bin" > "$STATE/data-deploy.json.tmp"
+  mv "$STATE/data-deploy.json.tmp" "$STATE/data-deploy.json"
+  $DEVNET mine 3 >/dev/null
+fi
+$DEPLOY_PY write --network devnet --network-id 2 --rpc "$RPC" --monitor-url http://127.0.0.1:18199 \
+  --node-lock-json "$STATE/node-lock-deploy.json" --data-json "$STATE/data-deploy.json" --data-bin "$STATE/deployment-devnet.bin" \
+  --service-elf "$ELF" --csr-deployment "$CSR_DIR/deployments/devnet.json" --type-id-hash "$TYPE_ID_CODE_HASH" \
+  --out "$ROOT/deployments/devnet.json"
 log "wrote deployments/devnet.json"
-python3 -I - "$ROOT/deployments/devnet.json" "$STATE/deployment-devnet.bin" <<'PY'
-import json, sys
-d = json.load(open(sys.argv[1]))
-h = lambda s: bytes.fromhex(s[2:] if s.startswith("0x") else s)
-op = d["node_lock"]["out_point"]
-out = bytes([1, d["network_id"]]) + h(d["node_lock"]["code_hash"]) + h(op["tx_hash"]) + op["index"].to_bytes(4, "little") + h(d["type_id_code_hash"])
-assert len(out) == 102, len(out)
-open(sys.argv[2], "wb").write(out)
-PY
 
 # 5. runners: own data root, config, dashboard port and service key; registration with a devnet stake
 for i in $(seq 1 "$N"); do

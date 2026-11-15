@@ -6,7 +6,7 @@
 #   --node-lock PATH crt-node-lock binary (default contracts/build/release/crt-node-lock)
 #   --csr DIR        CSR checkout with a built csr-dev (default .refs/csr)
 #   --rpc URL        testnet RPC (default https://testnet.ckb.dev/)
-#   --dry-run        build and print the transactions, send nothing, write nothing
+#   --dry-run        print what would be deployed, send nothing, write nothing
 # Refuses to overwrite an existing deployments/testnet.json.
 set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
@@ -30,15 +30,29 @@ CSR_DEV="$CSR_DIR/target/debug/csr-dev"
 [ -x "$CSR_DEV" ] || { echo "missing $CSR_DEV (cargo build -p csr-dev in $CSR_DIR)" >&2; exit 1; }
 OUT="$ROOT/deployments/testnet.json"
 [ "$DRY" = 1 ] || [ ! -e "$OUT" ] || { echo "$OUT exists; refusing to deploy twice" >&2; exit 1; }
-EXTRA=(); [ "$DRY" = 1 ] && EXTRA=(--dry-run)
+ELF="$ROOT/service/build/crt-service.elf"
+[ -f "$ELF" ] || { echo "missing $ELF (scripts/build-service.sh)" >&2; exit 1; }
+CSR_DEPLOYMENT="$CSR_DIR/deployments/testnet.json"
+[ -f "$CSR_DEPLOYMENT" ] || { echo "missing $CSR_DEPLOYMENT (CSR's testnet deployment)" >&2; exit 1; }
+TYPE_ID_CODE_HASH=0x00000000000000000000000000000000000000000000000000545950455f4944
+WORK="$ROOT/.devnet/testnet-deploy"; mkdir -p "$WORK"
+DEPLOY_PY="python3 -I $ROOT/scripts/deployment.py"
+export CSR_DEV_TESTNET_KEY="$(tr -d '[:space:]' < "$KEY")"   # csr-dev reads the testnet key from this variable; never printed
+if [ "$DRY" = 1 ]; then   # csr-dev has no dry-run: print the plan and stop before anything is sent
+  SIZE=$(wc -c < "$NODE_LOCK")
+  echo "dry run: would deploy crt-node-lock ($SIZE bytes, about $((SIZE + 100)) CKB locked) and the 102-byte deployment data cell to $RPC"
+  echo "         with the key in $KEY; would write $OUT. Nothing sent."
+  exit 0
+fi
 echo "deploying crt-node-lock ($(wc -c < "$NODE_LOCK") bytes) to $RPC"
-RES=$("$CSR_DEV" --rpc "$RPC" --json deploy-service --elf "$NODE_LOCK" --key-file "$KEY" "${EXTRA[@]}")
-echo "$RES"
-if [ "$DRY" = 1 ]; then echo "dry run: nothing sent, $OUT not written"; exit 0; fi
-printf '%s' "$RES" | python3 -I -c '
-import json, sys
-r = json.load(sys.stdin)
-d = {"network": "testnet", "network_id": 1, "enabled": True,
-     "node_lock": {"code_hash": r["code_hash"], "hash_type": "data2", "out_point": {"tx_hash": r["tx_hash"], "index": r.get("index", 0)}}}
-json.dump(d, open(sys.argv[1], "w"), indent=2); open(sys.argv[1], "a").write("\n")' "$OUT"
-echo "wrote $OUT; out point $(python3 -I -c 'import json,sys;print(json.load(open(sys.argv[1]))["node_lock"]["out_point"])' "$OUT")"
+"$CSR_DEV" --rpc "$RPC" --json deploy-service --elf "$NODE_LOCK" > "$WORK/node-lock.json"
+cat "$WORK/node-lock.json"
+$DEPLOY_PY data-bin --network-id 1 --node-lock-json "$WORK/node-lock.json" --type-id-hash "$TYPE_ID_CODE_HASH" --out "$WORK/deployment-testnet.bin"
+echo "deploying the CRT deployment data cell (102 bytes)"
+"$CSR_DEV" --rpc "$RPC" --json deploy-service --elf "$WORK/deployment-testnet.bin" > "$WORK/data.json"
+cat "$WORK/data.json"
+$DEPLOY_PY write --network testnet --network-id 1 --rpc "$RPC" --monitor-url https://csr-monitor.chainsolution.net/testnet \
+  --node-lock-json "$WORK/node-lock.json" --data-json "$WORK/data.json" --data-bin "$WORK/deployment-testnet.bin" \
+  --service-elf "$ELF" --csr-deployment "$CSR_DEPLOYMENT" --type-id-hash "$TYPE_ID_CODE_HASH" --out "$OUT"
+cp "$WORK/deployment-testnet.bin" "$ROOT/deployments/testnet-data-cell.bin"
+echo "wrote $OUT and deployments/testnet-data-cell.bin"
