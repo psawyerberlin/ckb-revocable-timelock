@@ -17,7 +17,7 @@ server {
     location /app/ { try_files $uri $uri/ /app/index.html; }   # the app is a single-page app
     add_header X-Content-Type-Options nosniff;
     add_header Referrer-Policy no-referrer;
-    add_header Content-Security-Policy "default-src 'self'; connect-src 'self' https://testnet.ckb.dev https://mainnet.ckb.dev https://csr-monitor.chainsolution.net https://*.joy.id; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'wasm-unsafe-eval'";
+    add_header Content-Security-Policy "default-src 'self'; connect-src 'self' https://testnet.ckb.dev https://mainnet.ckb.dev https://csr-monitor.chainsolution.net https://*.joy.id https://cota.nervina.dev wss://testnet.ckb.dev wss://mainnet.ckb.dev; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'wasm-unsafe-eval'";
 }
 ```
 

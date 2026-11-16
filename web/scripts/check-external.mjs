@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
 const dir = process.argv[2] ?? fileURLToPath(new URL('../dist/', import.meta.url));
-const allowed = /ckb\.dev|chainsolution\.net|joy\.id|joyid\.dev|w3\.org|localhost|127\.0\.0\.1|nervos\.org|github\.com/;
+const allowed = /ckb\.dev|chainsolution\.net|joy\.id|joyid\.dev|cota\.nervina\.dev|w3\.org|localhost|127\.0\.0\.1|nervos\.org|github\.com/;
 const walk = (d) => readdirSync(d, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(path.join(d, e.name)) : [path.join(d, e.name)]));
 const bad = new Set();
 for (const f of walk(dir).filter((f) => /\.(js|html|css)$/.test(f))) {

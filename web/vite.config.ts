@@ -19,14 +19,13 @@ function resolveClientDeps(): Plugin {
 
 /**
  * CCC's bundle carries hosts the app never contacts: the second public RPC mirror (`*.ckbapp.dev`), documentation
- * links in error messages and the COTA aggregator. The built app must contain no external host except the configured
+ * links in error messages. The COTA aggregator is kept: JoyID sub-key wallets call it before signing. The built app must contain no external host except the configured
  * RPC and wallet ones, so these strings are rewritten (SPEC-less hardening, see DECISIONS.md, spec 04 phase 4).
  */
 function stripUnusedHosts(): Plugin {
   const rules: [RegExp, string][] = [
     [/,?"https:\/\/(?:main|test)net\.ckbapp\.dev\/"/g, ''],
     [/https:\/\/api\.ckbccc\.com\//g, 'https://github.com/ckb-devrel/ccc/'],
-    [/https:\/\/cota\.nervina\.dev\/(?:mainnet-)?aggregator/g, 'https://crt.chainsolution.net/app/unused'],
     [/nervosnetwork\\+\.github\\+\.io\//g, 'github.com/nervosnetwork/'],
   ];
   return {
