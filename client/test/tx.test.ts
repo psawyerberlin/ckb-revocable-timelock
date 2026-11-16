@@ -435,3 +435,11 @@ test('heartbeat jobs cover deadline + the deployment grace', async () => {
   assert.equal(day.remainingRuns, Math.ceil((1_800 + 86_400) / (10 * 100)));
   assert.equal(drill.remainingRuns, Math.ceil((1_800 + 600) / (10 * 100)));
 });
+
+test('build_arm_accepts_a_rehearsal_deadline_below_30_minutes', async () => {
+  // A 30-minute rehearsal: Create checked the term; by Arm (after the guardians' commits) less than 30 minutes remain.
+  const { chain, ctx } = await setup();
+  const { T } = putSwitch(chain, (await ctx.signer.getRecommendedAddressObj()).script, { deadline: NOW + 1_200n });
+  const tx = await buildArm(T, h(0x99), { ...ctx, params: { heartbeatBlocks: 50 } });
+  assert.ok(tx.outputs.length > 0);
+});

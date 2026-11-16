@@ -72,7 +72,9 @@ export async function buildArm(T: string, descriptorHash: string | Uint8Array, c
   const missing = nodes.filter((n) => !jobs.some((j) => j.R === n.R && j.job.trigger.kind === 'Every'));
   if (missing.length) {
     const p: SwitchParams = { ...defaultSwitchParams(), ...currentHeartbeatParams(jobs), ...ctx.params, organiserFee: 0n };
-    validateSwitchParams(p, { networkId: d.network_id, termSeconds: Number(deadline - at.now) });
+    // No minimum-term check here: the deadline was fixed and checked at Create, and the guardians' commits take minutes,
+    // so a 30-minute rehearsal is always below 30 minutes by now. heartbeatJob still refuses a deadline + grace in the past.
+    validateSwitchParams(p, { networkId: d.network_id });
     for (const n of missing) {
       const o = jobOutput(d, n.R, heartbeatJob(t, p, at, deadline, blockSecondsOf(ctx), ownerLockHash, graceSeconds(d)));
       tx.addOutput(o.cellOutput, o.outputData);
