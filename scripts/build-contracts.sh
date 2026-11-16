@@ -15,6 +15,13 @@ TARGET=riscv64imac-unknown-none-elf
 LOCKED=""
 [ -f "$ROOT/contracts/Cargo.lock" ] && LOCKED="--locked"
 OUT="$ROOT/contracts/build/release"
+# CRT_DRILL=1: the testnet-only rehearsal variant (GRACE 600 s) into contracts/build/drill/, own target dir
+FEATURES=""
+if [ "${CRT_DRILL:-0}" = "1" ]; then
+  FEATURES="--features drill"
+  OUT="$ROOT/contracts/build/drill"
+  CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$ROOT/contracts/target-drill}"
+fi
 # CARGO_TARGET_DIR: e.g. the contract tests' build.rs builds into its own directory (no lock on contracts/target)
 TARGET_DIR="${CARGO_TARGET_DIR:-$ROOT/contracts/target}"
 mkdir -p "$OUT"
@@ -36,7 +43,7 @@ build() {
   local args=""
   for c in "$@"; do args="$args -p $c"; done
   # shellcheck disable=SC2086
-  cargo build --manifest-path "$ROOT/contracts/Cargo.toml" --release --target $TARGET -j 2 $LOCKED $args \
+  cargo build --manifest-path "$ROOT/contracts/Cargo.toml" --target-dir "$TARGET_DIR" --release --target $TARGET -j 2 $LOCKED $args $FEATURES \
     --config "target.$TARGET.rustflags=['-C','link-arg=-s']"
   for c in "$@"; do
     cp "$TARGET_DIR/$TARGET/release/$c" "$OUT/$c"
@@ -44,7 +51,7 @@ build() {
     echo "  $c data hash: $(data_hash "$OUT/$c")"
   done
 }
-echo "== CRT contracts =="
+echo "== CRT contracts${FEATURES:+ (drill: GRACE 600 s)} =="
 # crt-node-lock hand-parses its data (no ckb-types / bytes, so no atomics) and is referenced with hash type
 # data2 (SPEC.md §4).
 build crt-node-lock

@@ -10,7 +10,12 @@ use k256::{AffinePoint, EncodedPoint, NonZeroScalar};
 pub const PREFIX_CELL: &[u8] = b"CRT/v1/cell";
 pub const PREFIX_SHARE: &[u8] = b"CRT/v1/share";
 pub const PREFIX_DESCRIPTOR: &[u8] = b"CRT/v1/descriptor";
+/// Time after the deadline before a guardian may release (SPEC.md §6). The `drill` feature builds the testnet-only
+/// rehearsal variant (separate binaries, so a separate code hash and deployment); mainnet always uses 24 h.
+#[cfg(not(feature = "drill"))]
 pub const GRACE_SECONDS: u64 = 86_400;
+#[cfg(feature = "drill")]
+pub const GRACE_SECONDS: u64 = 600;
 pub const PAYLOAD_MAGIC: &[u8; 4] = b"CRTS";
 pub const PAYLOAD_VERSION: u8 = 1;
 pub const ALIVE_CELL_DATA: [u8; 4] = [0x43, 0x52, 0x54, 0x01];
@@ -251,5 +256,22 @@ mod tests {
         assert!(!is_valid_compressed_pubkey(&bad));
         bad[0] = 4;
         assert!(!is_valid_compressed_pubkey(&bad));
+    }
+}
+
+#[cfg(test)]
+mod grace_tests {
+    use super::GRACE_SECONDS;
+
+    #[test]
+    #[cfg(not(feature = "drill"))]
+    fn grace_is_24_hours() {
+        assert_eq!(GRACE_SECONDS, 86_400);
+    }
+
+    #[test]
+    #[cfg(feature = "drill")]
+    fn drill_grace_is_10_minutes() {
+        assert_eq!(GRACE_SECONDS, 600);
     }
 }

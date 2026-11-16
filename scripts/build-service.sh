@@ -15,17 +15,23 @@ LOCKED=""
 [ -f "$ROOT/service/Cargo.lock" ] && LOCKED="--locked"
 OUT="$ROOT/service/build"
 TARGET_DIR="${CARGO_TARGET_DIR:-$ROOT/service/target}"
+# CRT_DRILL=1: the testnet-only rehearsal variant (GRACE 600 s) as service/build/crt-service-drill.elf
+FEATURES=""; ELF="crt-service.elf"
+if [ "${CRT_DRILL:-0}" = "1" ]; then
+  FEATURES="--features drill"; ELF="crt-service-drill.elf"
+  TARGET_DIR="${CARGO_TARGET_DIR:-$ROOT/service/target-drill}"
+fi
 mkdir -p "$OUT"
 
-cargo build --manifest-path "$ROOT/service/Cargo.toml" --release --target $TARGET -j 2 $LOCKED -p crt-service \
+CARGO_TARGET_DIR="$TARGET_DIR" cargo build --manifest-path "$ROOT/service/Cargo.toml" --release --target $TARGET -j 2 $LOCKED -p crt-service $FEATURES \
   --config "target.$TARGET.rustflags=['-C','link-arg=-s']"
-cp "$TARGET_DIR/$TARGET/release/crt-service" "$OUT/crt-service.elf"
-echo "crt-service.elf: $(stat -c %s "$OUT/crt-service.elf") bytes"
+cp "$TARGET_DIR/$TARGET/release/crt-service" "$OUT/$ELF"
+echo "$ELF: $(stat -c %s "$OUT/$ELF") bytes"
 if command -v python3 >/dev/null 2>&1; then
   H=$(python3 -I -c 'import hashlib, sys
 h = hashlib.blake2b(digest_size=32, person=b"ckb-default-hash")
 h.update(open(sys.argv[1], "rb").read())
-print("0x" + h.hexdigest())' "$OUT/crt-service.elf")
+print("0x" + h.hexdigest())' "$OUT/$ELF")
   echo "CRT_CODE_HASH=$H"
 else
   echo "(python3 not found: CRT_CODE_HASH not computed)"

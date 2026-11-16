@@ -30,7 +30,7 @@ pub const DEADLINE: u64 = 1_800_000_000;
 
 /// Path of the built lock.
 pub fn contract_path() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../build/release/crt-node-lock")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(if cfg!(feature = "drill") { "../build/drill/crt-node-lock" } else { "../build/release/crt-node-lock" })
 }
 
 pub fn load_lock() -> Bytes {

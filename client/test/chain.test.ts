@@ -275,3 +275,16 @@ test('verify_hard_fail_no_override', async () => {
   for (const bad of ['skipVerif', 'insecure', 'allowUnverified', '--force']) assert.ok(!src.toLowerCase().includes(bad.toLowerCase()), bad);
   assert.equal(verifyNodes.length, 3);
 });
+
+test('deployment grace: default 24 h, rehearsal variant on test networks only', async () => {
+  const { graceSeconds } = await import('../src/chain/deployment.ts');
+  assert.equal(graceSeconds(parseDeployment(deploymentJson())), 86_400);
+  const drill = parseDeployment({ ...deploymentJson(), network_id: 1, grace_seconds: 600, drill: true });
+  assert.equal(graceSeconds(drill), 600);
+  assert.equal(drill.drill, true);
+  assert.throws(() => parseDeployment({ ...deploymentJson(), network_id: 0, grace_seconds: 600 }), DeploymentError);
+  assert.throws(() => parseDeployment({ ...deploymentJson(), network_id: 0, drill: true }), DeploymentError);
+  assert.throws(() => parseDeployment({ ...deploymentJson(), network_id: 1, grace_seconds: 59 }), DeploymentError);
+  assert.throws(() => parseDeployment({ ...deploymentJson(), network_id: 1, grace_seconds: 86_401 }), DeploymentError);
+  assert.equal(graceSeconds(parseDeployment({ ...deploymentJson(), network_id: 0, grace_seconds: 86_400 })), 86_400);
+});

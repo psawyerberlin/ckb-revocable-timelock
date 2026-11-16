@@ -108,12 +108,12 @@ export function keygenJob(T: string, p: Pick<SwitchParams, 'keygenTip' | 'maxFee
   };
 }
 
-/** Heartbeat job covering now → deadline + GRACE; expiry = end of term + ≈ 7 days. */
+/** Heartbeat job covering now → deadline + grace (the deployment's, default 24 h); expiry = end of term + ≈ 7 days. */
 export function heartbeatJob(
   T: string, p: Pick<SwitchParams, 'heartbeatBlocks' | 'heartbeatTip' | 'maxFee'>,
-  at: ChainNow, deadline: bigint, blockSeconds: number, refundLockHash: string,
+  at: ChainNow, deadline: bigint, blockSeconds: number, refundLockHash: string, graceSeconds: number = GRACE_SECONDS,
 ): CrtJob {
-  const term = deadline + BigInt(GRACE_SECONDS) - at.now;
+  const term = deadline + BigInt(graceSeconds) - at.now;
   if (term <= 0n) throw new TxBuildError('deadline + GRACE is already in the past');
   const runs = heartbeatRuns(term, p.heartbeatBlocks, blockSeconds);
   const termBlocks = BigInt(runs) * BigInt(p.heartbeatBlocks);

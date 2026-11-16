@@ -24,6 +24,16 @@ export interface Deployment {
   monitor_url: string;
   /** optional override of the 10.8 s default used by the cost estimator */
   block_seconds?: number;
+  /** release grace of this deployment's contracts (SPEC.md §6); absent = 86 400. Only the testnet rehearsal variant
+   *  (`deployments/testnet-drill.json`, contracts built with the `drill` feature) sets another value. */
+  grace_seconds?: number;
+  /** true for the rehearsal variant */
+  drill?: boolean;
+}
+
+/** The grace a deployment's contracts enforce: `grace_seconds`, else 24 h. */
+export function graceSeconds(d: Pick<Deployment, 'grace_seconds'>): number {
+  return d.grace_seconds ?? 86_400;
 }
 
 const isHex = (s: unknown, bytes?: number): s is string =>
@@ -66,6 +76,12 @@ export function parseDeployment(json: unknown): Deployment {
   try { csrDep = loadCsrDeployment(csr.deployment); } catch (e) { throw new DeploymentError(`csr.deployment: ${(e as Error).message}`); }
   if (!Array.isArray(d.rpc_urls) || d.rpc_urls.length === 0) throw new DeploymentError('rpc_urls: expected a non-empty list');
   if (d.block_seconds !== undefined && !(typeof d.block_seconds === 'number' && d.block_seconds > 0)) throw new DeploymentError('block_seconds: invalid');
+  if (d.grace_seconds !== undefined) {
+    if (!Number.isInteger(d.grace_seconds) || d.grace_seconds < 60 || d.grace_seconds > 86_400) throw new DeploymentError('grace_seconds: expected 60 … 86400');
+    if (d.network_id === 0 && d.grace_seconds !== 86_400) throw new DeploymentError('grace_seconds: mainnet always uses 86400');
+  }
+  if (d.drill !== undefined && typeof d.drill !== 'boolean') throw new DeploymentError('drill: expected a boolean');
+  if (d.drill === true && d.network_id === 0) throw new DeploymentError('drill: not on mainnet');
   const out: Deployment = {
     network_id: d.network_id,
     node_lock: scriptRef(d.node_lock, 'node_lock'),
@@ -84,6 +100,8 @@ export function parseDeployment(json: unknown): Deployment {
     monitor_url: url(d.monitor_url, 'monitor_url'),
   };
   if (d.block_seconds !== undefined) out.block_seconds = d.block_seconds;
+  if (d.grace_seconds !== undefined) out.grace_seconds = d.grace_seconds;
+  if (d.drill !== undefined) out.drill = d.drill;
   if (String(csrDep.registry_type_hash).toLowerCase() !== out.csr.registry_type_hash) throw new DeploymentError('csr.deployment.registry_type_hash differs from csr.registry_type_hash');
   return out;
 }

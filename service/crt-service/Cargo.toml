@@ -11,6 +11,7 @@ test = false
 
 [features]
 mock = ["crt-host/mock"]
+drill = ["crt-core/drill"]
 
 [dependencies]
 crt-host = { path = "../crt-host" }

@@ -93,6 +93,20 @@ have to publish anything. To be listed in the client's runner directory, open a 
 `deployments/<network>-runners.json` (peer id, `R`, a label) — optional; clients can also find you by watching the
 chain.
 
+## Enable the rehearsal service (testnet, optional)
+
+Testnet also has a **rehearsal deployment** of CRT (`deployments/testnet-drill.json`): the same contracts built with a
+10-minute grace instead of 24 hours, used by apps for short fire drills (dead-man-switch). It is a separate CRT service
+with its own manifests (`deployments/testnet-drill-manifests/<R>.json`). A runner that wants to guard drills enables it
+next to the normal service; nothing else changes:
+
+```sh
+sudo -u csr bash scripts/crt-enable.sh --network testnet --deployment testnet-drill --csr /usr/local/bin/csr
+```
+
+(the same `csr` and data root as for the normal service). The operator publishes the manifest first:
+`scripts/crt-publish.sh --deployment testnet-drill …`.
+
 ## Watch it
 
 The CSR dashboard's **Jobs** page shows every CRT run with a result `CRT1 <status> <T>`. Per status byte:

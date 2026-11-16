@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Rehearsal deployment for testnet: `drill` feature (crt-core, crt-node-lock, crt-service, contract tests) with
+  `GRACE` 600 s; `CRT_DRILL=1` in the build scripts; `deploy-testnet.sh --drill` writes `deployments/testnet-drill.json`
+  (`grace_seconds`, `drill`); `crt-publish.sh` / `crt-enable.sh --deployment testnet-drill`. The client reads the grace
+  from the deployment (`graceSeconds`, heartbeat jobs cover deadline + grace) and refuses another grace or `drill` on
+  mainnet. The normal deployments and binaries are unchanged.
 - `@crt/client` packaging: the build copies `vendor/csr-job.mjs` into `dist/vendor/` and checks that the built entry
   loads; `main`/`types`/`exports` point at `dist/src/` where `tsc` writes them. Before, `dist/` could not be imported.
 - `@crt/client`: minimum term 30 minutes on testnet and devnet (client check, like `n`; mainnet keeps 1 day) for short

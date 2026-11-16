@@ -1,5 +1,6 @@
 // Owner transactions after Create (SPEC §6): Arm, Renew, Rewrap, Cancel, Reclaim.
 import { ccc } from '@ckb-ccc/core';
+import { graceSeconds } from '../chain/deployment.ts';
 import { bytesToHex } from '../core/bytes.ts';
 import { encodeNodeCellData, newNodeCellData, NODE_CELL_DATA_LEN } from '../core/cells.ts';
 import { SWITCH_PARAM_RANGES, type SwitchParams, validateSwitchParams } from '../core/cost.ts';
@@ -73,7 +74,7 @@ export async function buildArm(T: string, descriptorHash: string | Uint8Array, c
     const p: SwitchParams = { ...defaultSwitchParams(), ...currentHeartbeatParams(jobs), ...ctx.params, organiserFee: 0n };
     validateSwitchParams(p, { networkId: d.network_id, termSeconds: Number(deadline - at.now) });
     for (const n of missing) {
-      const o = jobOutput(d, n.R, heartbeatJob(t, p, at, deadline, blockSecondsOf(ctx), ownerLockHash));
+      const o = jobOutput(d, n.R, heartbeatJob(t, p, at, deadline, blockSecondsOf(ctx), ownerLockHash, graceSeconds(d)));
       tx.addOutput(o.cellOutput, o.outputData);
     }
     tx.addCellDeps(csrJobDeps(d));
@@ -101,7 +102,7 @@ export async function buildRenew(T: string, newDeadline: bigint | number, params
   const tx = ccc.Transaction.from({});
   for (const n of nodes) addNodeUpdate(tx, n, { deadline });
   for (const n of nodes) {
-    const o = jobOutput(d, n.R, heartbeatJob(t, p, at, deadline, blockSecondsOf(ctx), ownerLockHash));
+    const o = jobOutput(d, n.R, heartbeatJob(t, p, at, deadline, blockSecondsOf(ctx), ownerLockHash, graceSeconds(d)));
     tx.addOutput(o.cellOutput, o.outputData);
   }
   tx.addCellDeps(nodeLockDep(d), ...csrJobDeps(d));

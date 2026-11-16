@@ -55,6 +55,10 @@ def write(a):
         "type_id_code_hash": a.type_id_hash,
         "rpc_urls": [a.rpc], "monitor_url": a.monitor_url,
     }
+    if a.grace_seconds != 86400:   # the testnet rehearsal variant (contracts built with the `drill` feature)
+        assert a.network_id != 0, "mainnet always uses GRACE 86400"
+        d["grace_seconds"] = a.grace_seconds
+        d["drill"] = True
     tmp = a.out + ".tmp"
     with open(tmp, "w") as f:
         json.dump(d, f, indent=2); f.write("\n")
@@ -70,5 +74,6 @@ w = sub.add_parser("write")
 for k in ("network", "rpc", "monitor-url", "node-lock-json", "data-json", "data-bin", "service-elf", "csr-deployment", "type-id-hash", "out"):
     w.add_argument("--" + k, required=True)
 w.add_argument("--network-id", type=int, required=True)
+w.add_argument("--grace-seconds", type=int, default=86400)
 a = p.parse_args()
 {"data-bin": data_bin, "write": write}[a.cmd](a)

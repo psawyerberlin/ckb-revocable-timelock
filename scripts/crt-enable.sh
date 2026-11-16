@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Enables the CRT service on this CSR runner (docs/operators.md).
-# Usage: crt-enable.sh [--network testnet|mainnet] [--dry-run] [--csr PATH] [--manifest FILE] [--runner-lock-hash 0x..]
+# Usage: crt-enable.sh [--network testnet|mainnet] [--deployment testnet-drill] [--dry-run] [--csr PATH] [--manifest FILE]
+#                      [--runner-lock-hash 0x..]
+# --deployment testnet-drill enables the testnet rehearsal variant (GRACE 600 s) next to the normal CRT service.
 # The CRT operator publishes one on-chain manifest per runner (scripts/crt-publish.sh, args = the runner's lock hash R)
 # and lists it in deployments/<network>-manifests/<R>.json of the repository. This script finds the file for your R
 # (a local checkout, or raw.githubusercontent.com), then runs `csr service add-onchain --manifest <out point> --approve`
@@ -14,6 +16,7 @@ REPO=psawyerberlin/ckb-revocable-timelock
 while [ $# -gt 0 ]; do
   case "$1" in
     --network) NETWORK="$2"; shift ;;
+    --deployment) DEPLOYMENT="$2"; shift ;;
     --dry-run) DRY=1 ;;
     --csr) CSR="$2"; shift ;;
     --manifest) FILE="$2"; shift ;;
@@ -24,6 +27,12 @@ while [ $# -gt 0 ]; do
   shift
 done
 case "$NETWORK" in testnet|mainnet) ;; *) echo "--network must be testnet or mainnet" >&2; exit 2 ;; esac
+DEPLOYMENT="${DEPLOYMENT:-$NETWORK}"
+case "$DEPLOYMENT" in
+  "$NETWORK") ;;
+  testnet-drill) [ "$NETWORK" = testnet ] || { echo "the drill deployment exists on testnet only" >&2; exit 2; } ;;
+  *) echo "--deployment must be $NETWORK or testnet-drill" >&2; exit 2 ;;
+esac
 run() { if [ "$DRY" = 1 ]; then echo "[dry-run] $*"; else "$@"; fi; }
 json() { python3 -I -c 'import json,sys; print(json.load(sys.stdin)[sys.argv[1]])' "$1"; }
 
@@ -43,10 +52,10 @@ echo "Runner lock hash R: $R"
 
 # 3. the manifest the operator published for this runner
 if [ -z "$FILE" ]; then
-  FILE="$ROOT/deployments/$NETWORK-manifests/$R.json"
+  FILE="$ROOT/deployments/$DEPLOYMENT-manifests/$R.json"
   if [ ! -f "$FILE" ]; then
-    mkdir -p "$WORK"; FILE="$WORK/$NETWORK-$R.json"
-    URL="https://raw.githubusercontent.com/$REPO/main/deployments/$NETWORK-manifests/$R.json"
+    mkdir -p "$WORK"; FILE="$WORK/$DEPLOYMENT-$R.json"
+    URL="https://raw.githubusercontent.com/$REPO/main/deployments/$DEPLOYMENT-manifests/$R.json"
     if ! curl -fsSL "$URL" -o "$FILE.tmp" 2>/dev/null; then
       rm -f "$FILE.tmp"
       echo "No CRT manifest has been published for your runner yet ($URL)." >&2

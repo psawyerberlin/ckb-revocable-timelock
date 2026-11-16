@@ -13,3 +13,5 @@ k256 = { version = "0.13", default-features = false, features = ["arithmetic"] }
 [features]
 default = []
 alloc = []
+# testnet-only rehearsal build: GRACE_SECONDS = 600 (SPEC.md §6, deployments/testnet-drill.json)
+drill = []

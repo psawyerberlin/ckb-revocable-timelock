@@ -11,6 +11,8 @@
 #   --runner-lock-hash R   publish the manifest for this runner (repeat for several; without it, only the code cell)
 #   --elf PATH        crt-service.elf (default service/build/crt-service.elf)
 #   --csr-dev PATH    csr-dev (default .refs/csr/target/debug/csr-dev)
+#   --deployment NAME  testnet-drill: the rehearsal variant (GRACE 600 s); default = the network. Its files are
+#                     deployments/NAME.json, NAME-service.json, NAME-manifests/; default --elf service/build/crt-service-drill.elf
 #   --dry-run         build and check, send nothing
 # Writes deployments/<network>-service.json (the code cell) and deployments/<network>-manifests/<R>.json; commit them.
 # Idempotent: an existing code cell file or manifest file is reused.
@@ -25,6 +27,7 @@ while [ $# -gt 0 ]; do
     --runner-lock-hash) RS+=("$2"); shift ;;
     --elf) ELF="$2"; shift ;;
     --csr-dev) CSR_DEV="$2"; shift ;;
+    --deployment) DEPLOYMENT="$2"; shift ;;
     --dry-run) DRY=1 ;;
     -h|--help) sed -n '2,/^set -euo/p' "$0" | sed '$d' | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown option $1" >&2; exit 2 ;;
@@ -32,18 +35,27 @@ while [ $# -gt 0 ]; do
   shift
 done
 case "$NETWORK" in testnet|mainnet) ;; *) echo "--network must be testnet or mainnet" >&2; exit 2 ;; esac
+DEPLOYMENT="${DEPLOYMENT:-$NETWORK}"
+case "$DEPLOYMENT" in
+  "$NETWORK") ;;
+  testnet-drill) [ "$NETWORK" = testnet ] || { echo "the drill deployment exists on testnet only" >&2; exit 2; } ;;
+  *) echo "--deployment must be $NETWORK or testnet-drill" >&2; exit 2 ;;
+esac
+[ "$DEPLOYMENT" = testnet-drill ] && [ "$ELF" = "$ROOT/service/build/crt-service.elf" ] && ELF="$ROOT/service/build/crt-service-drill.elf"
 [ -n "$KEY" ] && [ -f "$KEY" ] || { echo "--key-file FILE is required" >&2; exit 2; }
 [ -n "$CSR" ] && [ -x "$CSR" ] || { echo "--csr PATH (an executable csr) is required" >&2; exit 2; }
 [ -f "$ELF" ] || { echo "missing $ELF (scripts/build-service.sh)" >&2; exit 1; }
 [ -x "$CSR_DEV" ] || { echo "missing $CSR_DEV (cargo build -p csr-dev in .refs/csr)" >&2; exit 1; }
-DEP="$ROOT/deployments/$NETWORK.json"
+DEP="$ROOT/deployments/$DEPLOYMENT.json"
 [ -f "$DEP" ] || { echo "missing $DEP (deploy crt-node-lock first: scripts/deploy-testnet.sh)" >&2; exit 1; }
 json() { python3 -I -c 'import json,sys; print(json.load(sys.stdin)[sys.argv[1]])' "$1"; }
 RPC=$(python3 -I -c 'import json,sys; print(json.load(open(sys.argv[1]))["rpc_urls"][0])' "$DEP")
 DATA_TX=$(python3 -I -c 'import json,sys; print(json.load(open(sys.argv[1]))["crt_data_cell"]["tx_hash"])' "$DEP")
 CRT_CODE_HASH=$(python3 -I -c 'import json,sys; print(json.load(open(sys.argv[1]))["crt_code_hash"])' "$DEP")
-SVC="$ROOT/deployments/$NETWORK-service.json"
-MAN="$ROOT/deployments/$NETWORK-manifests"; mkdir -p "$MAN"
+ELF_HASH=$(python3 -I -c 'import hashlib,sys; h=hashlib.blake2b(digest_size=32, person=b"ckb-default-hash"); h.update(open(sys.argv[1],"rb").read()); print("0x"+h.hexdigest())' "$ELF")
+[ "$ELF_HASH" = "$CRT_CODE_HASH" ] || { echo "$ELF (hash $ELF_HASH) is not the service of $DEP (crt_code_hash $CRT_CODE_HASH)" >&2; exit 1; }
+SVC="$ROOT/deployments/$DEPLOYMENT-service.json"
+MAN="$ROOT/deployments/$DEPLOYMENT-manifests"; mkdir -p "$MAN"
 export CSR_DEV_TESTNET_KEY="$(tr -d '[:space:]' < "$KEY")"
 live() {   # wait (up to 5 minutes) until an out point is live: 0x<tx>:<index>
   python3 -I - "$RPC" "$1" <<'PY'
@@ -101,4 +113,4 @@ for R in "${RS[@]:-}"; do
   mv "$OUT.tmp" "$OUT"
   echo "manifest for $R: $(json manifest_outpoint < "$OUT") (service ID $(json service_id < "$OUT"))"
 done
-[ "$DRY" = 1 ] || echo "now: git add deployments/$NETWORK-service.json deployments/$NETWORK-manifests && git commit && git push"
+[ "$DRY" = 1 ] || echo "now: git add deployments/$DEPLOYMENT-service.json deployments/$DEPLOYMENT-manifests && git commit && git push"

@@ -423,3 +423,14 @@ test('job_cells_respect_min_capacity', async () => {
     assert.equal(o.outputData, ref.outputData);
   }
 });
+
+test('heartbeat jobs cover deadline + the deployment grace', async () => {
+  const { heartbeatJob } = await import('../src/tx/common.ts');
+  const p = { heartbeatBlocks: 100, heartbeatTip: 1n, maxFee: 1n };
+  const at = { tip: 1_000n, now: 1_000_000n };
+  const deadline = at.now + 1_800n;   // a 30-minute rehearsal
+  const day = heartbeatJob('0x' + '11'.repeat(32), p, at, deadline, 10, '0x' + '22'.repeat(32));
+  const drill = heartbeatJob('0x' + '11'.repeat(32), p, at, deadline, 10, '0x' + '22'.repeat(32), 600);
+  assert.equal(day.remainingRuns, Math.ceil((1_800 + 86_400) / (10 * 100)));
+  assert.equal(drill.remainingRuns, Math.ceil((1_800 + 600) / (10 * 100)));
+});

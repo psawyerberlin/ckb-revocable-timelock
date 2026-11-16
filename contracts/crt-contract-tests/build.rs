@@ -3,15 +3,15 @@
 use std::path::PathBuf;
 use std::process::Command;
 
-const BINARIES: [&str; 1] = ["release/crt-node-lock"];
-
 fn main() {
+    let drill = std::env::var_os("CARGO_FEATURE_DRILL").is_some();
+    let binaries: [&str; 1] = if drill { ["drill/crt-node-lock"] } else { ["release/crt-node-lock"] };
     let dir = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap());
     let build = dir.join("../build");
-    for b in BINARIES {
+    for b in binaries {
         println!("cargo:rerun-if-changed={}", build.join(b).display());
     }
-    if BINARIES.iter().all(|b| build.join(b).exists()) {
+    if binaries.iter().all(|b| build.join(b).exists()) {
         return;
     }
     let mut cmd = Command::new("bash");
@@ -28,7 +28,10 @@ fn main() {
             cmd.env_remove(k);
         }
     }
-    cmd.env("CARGO_TARGET_DIR", build.join("cargo-target"));
+    cmd.env("CARGO_TARGET_DIR", build.join(if drill { "cargo-target-drill" } else { "cargo-target" }));
+    if drill {
+        cmd.env("CRT_DRILL", "1");
+    }
     let status = cmd.status().expect("run scripts/build-contracts.sh");
     assert!(status.success(), "scripts/build-contracts.sh failed");
 }

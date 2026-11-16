@@ -8,3 +8,7 @@ description = "ckb-testtool harness and transaction tests for crt-node-lock (pha
 [dependencies]
 crt-core = { path = "../crt-core" }
 ckb-testtool = "1.1.1"
+
+[features]
+# the rehearsal variant: tests run against contracts/build/drill/crt-node-lock with GRACE 600 s
+drill = ["crt-core/drill"]

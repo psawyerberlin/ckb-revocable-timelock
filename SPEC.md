@@ -63,7 +63,7 @@ wallet; make any post-quantum claim. Applications (see `docs/developers.md`, and
 | Name | Value | Notes |
 |---|---|---|
 | `PREFIX` | `CRT/v1` | Resolves O-7. The `TMN/v1` prefix of v0.1-draft is abandoned. |
-| `GRACE` | 86 400 s (24 h) | Resolves O-8. Protocol constant, in the lock script. |
+| `GRACE` | 86 400 s (24 h) | Resolves O-8. Protocol constant, in the lock script. A separate **testnet-only rehearsal deployment** (`deployments/testnet-drill.json`) is built with the `drill` feature and uses 600 s; it has its own node lock code hash and CRT service, the deployment file states `grace_seconds`, and the client refuses any grace other than 86 400 s on mainnet. |
 | `HEARTBEAT` | per switch, default 8 000 blocks (≈ 1 day); allowed 1 000–60 000 (≈ 3 h – 1 week) | `Every(k)` interval of the heartbeat job. A **switch parameter** chosen at Create together with `n`, `t` and the mandatory set (§6.2). The lock does not care. |
 | `HEARTBEAT_TIP` | per switch, default 0.5 CKB; minimum 0.1 CKB | Tip per heartbeat run, also a switch parameter. Runners may refuse switches below their advertised minimum (§9). |
 | `network_id` | `0` mainnet, `1` testnet, `2` devnet | Same byte as `RegistryV3.network`. |

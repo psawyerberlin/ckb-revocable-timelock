@@ -8,3 +8,6 @@ description = "CRT Node Cell lock script for CKB-VM (SPEC.md §4), hash_type dat
 [dependencies]
 ckb-std = { workspace = true }
 crt-core = { path = "../crt-core" }
+
+[features]
+drill = ["crt-core/drill"]
