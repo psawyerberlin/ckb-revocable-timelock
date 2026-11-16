@@ -19,5 +19,5 @@ above (one entry per runner with an on-chain manifest in `testnet-manifests/<R>.
 The same contracts built with the `drill` feature (`CRT_DRILL=1 scripts/build-contracts.sh`, `CRT_DRILL=1
 scripts/build-service.sh`): `GRACE` 600 s instead of 86 400 s, so a different node lock code hash and CRT service.
 Written by `scripts/deploy-testnet.sh --drill`; has `"grace_seconds": 600, "drill": true`. Manifests in
-`testnet-drill-manifests/`, service cell in `testnet-drill-service.json` (`scripts/crt-publish.sh --deployment
+`testnet-drill-manifests/`, runners that guard drills in `testnet-drill-runners.json`, service cell in `testnet-drill-service.json` (`scripts/crt-publish.sh --deployment
 testnet-drill`). Testnet only: the client refuses `grace_seconds` other than 86 400 and `drill` on mainnet.
