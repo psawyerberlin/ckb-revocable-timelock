@@ -50,9 +50,10 @@ It shows MATCH when the embedded descriptor hashes to the value printed below, a
 <textarea id="crt-rpc-urls" rows="3" spellcheck="false">%%RPC_URLS%%</textarea>
 <p><button type="button" id="crt-btn-check">Check the switch</button>
 <button type="button" id="crt-btn-online">Recover from the chain</button></p>
-<h3>Offline (paste release values)</h3>
+<h3>Offline (paste release values or the recovered key)</h3>
 <p>Paste one release value per line: the private key a runner published (64 hex digits), or
-<code>runner_lock_hash:private_key</code>, or the full data of a released Node Cell.</p>
+<code>runner_lock_hash:private_key</code>, or the full data of a released Node Cell. Or paste the recovered key
+alone (64 hex digits, kept from an earlier opening): it opens this page without the chain.</p>
 <textarea id="crt-paste" rows="6" spellcheck="false"></textarea>
 <p><button type="button" id="crt-btn-offline">Recover from pasted values</button></p>
 <h3>Result</h3>

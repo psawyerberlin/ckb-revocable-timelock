@@ -1,6 +1,6 @@
 // Entry point of the code embedded in every recovery kit (bundled to one IIFE by scripts/build-kit.mjs).
 // Zero network access except the CKB JSON-RPC URLs the user lists in the page.
-import { bytesToHex } from '../src/core/bytes.ts';
+import { bytesToHex, hexToBytes } from '../src/core/bytes.ts';
 import { type Descriptor, type Envelope, RecoveryError, descriptorHash, unwrapAll, validateDescriptor } from '../src/kit/descriptor.ts';
 import { collectReleases, parseReleases, readSwitchOnline } from '../src/kit/recover.ts';
 
@@ -42,6 +42,12 @@ function rpcUrls(given?: string[]): string[] {
   const urls = (t?.value ?? t?.textContent ?? '').split(/\s+/).filter(Boolean);
   if (!urls.length) throw new Error('no RPC address given');
   return urls;
+}
+
+/** A 64-hex-digit value (with or without 0x) as 32 bytes, else null. */
+function asKey(v: string): Uint8Array | null {
+  const s = v.trim().toLowerCase().replace(/^0x/, '');
+  return /^[0-9a-f]{64}$/.test(s) ? hexToBytes('0x' + s) : null;
 }
 
 async function deliver(K: Uint8Array): Promise<Uint8Array> {
@@ -113,9 +119,20 @@ function wire(): void {
     const { releases, unmatched } = parseReleases(descriptor, lines);
     const short = (v: string): string => (v.length > 20 ? `${v.slice(0, 10)}…${v.slice(-6)}` : v);
     if (unmatched.length && releases.size === 0) {
-      throw new Error(`${unmatched.map(short).join(', ')}: not the release value of any guardian of this switch. `
-        + 'Paste the private key a guardian published in its released Node Cell (the last 32 bytes of the cell data), '
-        + 'not the recovered key.');
+      // No guardian's value: one 32-byte value may be the recovered key K itself (kept from an earlier opening).
+      const k = unmatched.length === 1 ? asKey(unmatched[0]!) : null;
+      if (k) {
+        if (w.crtApplication?.onKey) {
+          const ok = await w.crtApplication.onKey(k);
+          if (ok !== false) { setText('crt-key', bytesToHex(k)); return 'Opened with the recovered key (no chain needed).'; }
+        } else {
+          setText('crt-key', bytesToHex(k));
+          return 'Used as the recovered key; this kit has no application that could check it.';
+        }
+      }
+      throw new Error(`${unmatched.map(short).join(', ')}: neither the release value of a guardian of this switch nor its `
+        + 'recovered key. Paste the private key a guardian published in its released Node Cell (the last 32 bytes of '
+        + 'the cell data), or the key recovered earlier.');
     }
     const K = await kit.api!.recover(lines);
     return `Key recovered (${bytesToHex(K)}).${unmatched.length ? `\nIgnored ${unmatched.length} value(s) that match no node.` : ''}`;
