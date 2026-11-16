@@ -22,6 +22,8 @@ export type Step = (typeof STEPS)[number];
 const TITLES: Record<Step, string> = { deadline: 'Deadline', runners: 'Runners', quote: 'Quote', create: 'Create', arm: 'Arm', kit: 'Kit' };
 export const OPERATORS_URL = 'https://github.com/psawyerberlin/ckb-revocable-timelock/blob/main/docs/operators.md';
 const R = SWITCH_PARAM_RANGES;
+/** Smallest n of the network: mainnet keeps 3; testnet has few runners and allows 1 (the client applies the same rule from `network_id`). */
+export const minRunners = (network: string): number => (network === 'testnet' ? R.n.minTestNetworks : R.n.min);
 
 const err = (e: unknown) => (e instanceof Error ? e.message : String(e));
 const href = (s: Step) => `#/create/${s}`;
@@ -104,7 +106,7 @@ function runnersScreen(host: HTMLElement, d: Draft): void {
   const paint = (rows: RunnerRow[]) => {
     const byR = new Map(rows.map((r) => [r.runner.R, r]));
     const chosen = () => d.selected.map((r) => byR.get(r)?.runner).filter((r): r is Runner => r !== undefined);
-    const nIn = el('input', { type: 'number', id: 'n', min: String(R.n.min), max: String(R.n.max), value: String(d.n) });
+    const nIn = el('input', { type: 'number', id: 'n', min: String(minRunners(d.network)), max: String(R.n.max), value: String(d.n) });
     const tIn = el('input', { type: 'number', id: 't', min: '1', max: String(d.n), value: String(d.t) });
     const jIn = el('input', { type: 'number', id: 'j', min: '1', value: String(d.mandatoryJ) });
     const ackIn = el('input', { type: 'text', id: 'ack', autocomplete: 'off', value: d.ack });
@@ -126,7 +128,7 @@ function runnersScreen(host: HTMLElement, d: Draft): void {
         if (oneOfOne()) trade.append(el('p', { class: 'note', id: 'one-of-one' }, 'A single mandatory runner on a term over one year: if that runner is lost, the secret is lost. Type "I understand" to accept this.'), field('Type: I understand', ackIn));
       }
       const tOk = Number.isInteger(d.t) && d.t >= 1 && d.t <= d.n;
-      const ready = d.selected.length === d.n && tOk && d.n >= R.n.min && d.n <= R.n.max && (!oneOfOne() || d.ack.trim() === 'I understand')
+      const ready = d.selected.length === d.n && tOk && d.n >= minRunners(d.network) && d.n <= R.n.max && (!oneOfOne() || d.ack.trim() === 'I understand')
         && (m.length < 2 || (d.mandatoryJ >= 1 && d.mandatoryJ <= m.length));
       nextBox.replaceChildren(
         el('p', { class: 'muted', id: 'sel-count' }, `${d.selected.length} of ${d.n} runners selected.` + (d.n < R.n.warnBelow ? ' Warning: fewer than 5 runners means little redundancy or little protection.' : '')),
@@ -139,7 +141,7 @@ function runnersScreen(host: HTMLElement, d: Draft): void {
 
     nIn.addEventListener('input', () => {
       const v = Number(nIn.value);
-      if (Number.isInteger(v)) { d.n = v; tIn.max = String(v); d.selected = d.selected.slice(0, Math.max(v, 0)); d.mandatory = d.mandatory.filter((r) => d.selected.includes(r)); }
+      if (Number.isInteger(v)) { d.n = v; tIn.max = String(v); if (v >= 1 && d.t > v) { d.t = v; tIn.value = String(v); } d.selected = d.selected.slice(0, Math.max(v, 0)); d.mandatory = d.mandatory.filter((r) => d.selected.includes(r)); }
       commit();
     });
     tIn.addEventListener('input', () => { d.t = Number(tIn.value); commit(); });

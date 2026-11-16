@@ -4,7 +4,7 @@ import { fireEvent, getByText, getByRole, queryByText } from '@testing-library/d
 // No wallet or network in tests: the wallet module is replaced by an empty provider list.
 vi.mock('../src/wallet.ts', () => ({ listWallets: () => [], connect: async () => { throw new Error('no wallet'); }, readInfo: async () => { throw new Error('no wallet'); }, formatCkb: (v: bigint) => `${v} CKB` }));
 
-import { renderCreate, STEPS } from '../src/create.ts';
+import { minRunners, renderCreate, STEPS } from '../src/create.ts';
 import { renderManage } from '../src/manage.ts';
 import { renderRecover } from '../src/recover.ts';
 import { renderShell } from '../src/shell.ts';
@@ -41,6 +41,13 @@ describe('create flow screens render', () => {
     const d = defaultDraft(); d.deadline = Math.floor(Date.now() / 1000) + 6 * 365 * DAY; saveDraft(d);
     const host = mount(); renderCreate(host, 'deadline');
     expect(host.textContent).toMatch(/quantum/i);
+  });
+});
+
+describe('runner minimum', () => {
+  it('allows 1 runner on testnet and keeps 3 on mainnet', () => {
+    expect(minRunners('testnet')).toBe(1);
+    expect(minRunners('mainnet')).toBe(3);
   });
 });
 
