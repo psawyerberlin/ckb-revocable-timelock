@@ -7,7 +7,8 @@ export const SWITCH_PARAM_RANGES = {
   /** `min` is the mainnet minimum; `minTestNetworks` applies to testnet (1) and devnet (2), which have few runners */
   n: { min: 3, minTestNetworks: 1, max: 16, default: 8, warnBelow: 5 },
   t: { default: 5 },
-  heartbeatBlocks: { min: 1_000, max: 60_000, default: 8_000 },
+  /** `minTestNetworks` (50 blocks ≈ 9 min) applies to testnet and devnet only, for short rehearsals; mainnet keeps 1 000 */
+  heartbeatBlocks: { min: 1_000, minTestNetworks: 50, max: 60_000, default: 8_000 },
   heartbeatTip: { min: CKB / 10n, default: CKB / 2n },
   keygenTip: { min: CKB / 2n, default: CKB },
   maxFee: { min: 0n, default: CKB / 500n },
@@ -47,8 +48,9 @@ export function validateSwitchParams(p: SwitchParams, ctx: SwitchParamsContext =
   const R = SWITCH_PARAM_RANGES;
   const errors: string[] = [];
   const warnings: string[] = [];
-  if (!Number.isInteger(p.heartbeatBlocks) || p.heartbeatBlocks < R.heartbeatBlocks.min || p.heartbeatBlocks > R.heartbeatBlocks.max)
-    errors.push(`HEARTBEAT must be an integer between ${R.heartbeatBlocks.min} and ${R.heartbeatBlocks.max} blocks`);
+  const minHeartbeat = ctx.networkId === 1 || ctx.networkId === 2 ? R.heartbeatBlocks.minTestNetworks : R.heartbeatBlocks.min;
+  if (!Number.isInteger(p.heartbeatBlocks) || p.heartbeatBlocks < minHeartbeat || p.heartbeatBlocks > R.heartbeatBlocks.max)
+    errors.push(`HEARTBEAT must be an integer between ${minHeartbeat} and ${R.heartbeatBlocks.max} blocks`);
   if (p.heartbeatTip < R.heartbeatTip.min) errors.push('HEARTBEAT_TIP must be at least 0.1 CKB');
   if (p.keygenTip < R.keygenTip.min) errors.push('KEYGEN_TIP must be at least 0.5 CKB');
   if (p.maxFee < R.maxFee.min) errors.push('max fee must be >= 0');

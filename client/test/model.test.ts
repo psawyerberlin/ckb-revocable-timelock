@@ -172,3 +172,13 @@ test('switch_params_ranges', () => {
   validateSwitchParams(ok, { ...long, acknowledgedOneOfOne: true });
   validateSwitchParams(ok, { ...long, mandatory: { j: 2, m: 3 } });
 });
+
+test('heartbeat minimum: 50 blocks on test networks, 1 000 on mainnet', () => {
+  const p = { n: 3, t: 2, heartbeatBlocks: 50, heartbeatTip: 50_000_000n, keygenTip: 50_000_000n, maxFee: 0n, organiserFee: 0n } as any;
+  for (const networkId of [1, 2]) {
+    assert.doesNotThrow(() => validateSwitchParams(p, { networkId, termSeconds: 1_800 }));
+    assert.throws(() => validateSwitchParams({ ...p, heartbeatBlocks: 49 }, { networkId, termSeconds: 1_800 }));
+  }
+  assert.throws(() => validateSwitchParams(p, { networkId: 0, termSeconds: 86_400 }));
+  assert.doesNotThrow(() => validateSwitchParams({ ...p, heartbeatBlocks: 1_000 }, { networkId: 0, termSeconds: 86_400 }));
+});

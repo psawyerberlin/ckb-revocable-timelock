@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `@crt/client`: HEARTBEAT minimum 50 blocks on testnet and devnet (client check; mainnet keeps 1 000), so a rehearsal
+  is released minutes after deadline + grace.
 - Rehearsal deployment for testnet: `drill` feature (crt-core, crt-node-lock, crt-service, contract tests) with
   `GRACE` 600 s; `CRT_DRILL=1` in the build scripts; `deploy-testnet.sh --drill` writes `deployments/testnet-drill.json`
   (`grace_seconds`, `drill`); `crt-publish.sh` / `crt-enable.sh --deployment testnet-drill`. The client reads the grace

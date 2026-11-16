@@ -223,7 +223,8 @@ test('build_create_layout', async () => {
 test('build_create_validates_params', async () => {
   const { signer } = await setup();
   const base = { signer, deployment, deadline: NOW + 365n * DAY, runners: runnersR(5).map((R) => ({ R, servicePubkey })), feeRate: FEE_RATE };
-  await assert.rejects(buildCreate({ ...base, params: { ...PARAMS, heartbeatBlocks: 500 } }), SwitchParamsError);
+  await assert.rejects(buildCreate({ ...base, params: { ...PARAMS, heartbeatBlocks: 49 } }), SwitchParamsError); // test networks: >= 50 blocks
+  await assert.rejects(buildCreate({ ...base, deployment: { ...deployment, network_id: 0 }, params: { ...PARAMS, heartbeatBlocks: 500 } }), SwitchParamsError); // mainnet: >= 1 000 blocks
   await assert.rejects(buildCreate({ ...base, params: { ...PARAMS, heartbeatTip: CKB / 20n } }), SwitchParamsError);
   await assert.rejects(buildCreate({ ...base, deployment: { ...deployment, network_id: 0 }, runners: base.runners.slice(0, 2), params: PARAMS }), SwitchParamsError); // mainnet: n >= 3
   await assert.rejects(buildCreate({ ...base, deadline: NOW + 1200n, params: PARAMS }), SwitchParamsError); // test networks: term >= 30 min
