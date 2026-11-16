@@ -26,3 +26,28 @@ application included.
 **What it does not remove.** A coalition of `t` runners can still decrypt early (diversity of runners matters), and an
 item is only as private as its encryptor keeps the per-item key. With one testnet runner this mode can be built and
 tested, but gives no protection until independent runners exist.
+
+## R-2. One CRT service on CSR instead of two
+
+**Why.** Testnet runs two CRT services next to each other: the standard one (`deployments/testnet.json`, GRACE 24 h)
+and the rehearsal one (`deployments/testnet-drill.json`, GRACE 10 min, used for short fire drills). They have different
+code hashes, so each runner publishes and enables two manifests, and every app has to pick the right deployment.
+Operators should have to enable one service only.
+
+**Idea.** Make the grace period a per-switch value that the contract reads, instead of a build-time constant, so the
+same code and the same service ID serve both. Candidate design: the value is stored with the switch's parameters and
+the node lock checks `since >= deadline + grace`. The 24 h minimum is kept for real switches by the client (and by
+runners refusing a switch on mainnet with a smaller grace); drill-sized values are accepted on testnet and devnet only.
+
+**Open questions.** Where the grace value lives (Alive Cell data or Node Cell data; the Node Cell format is frozen at
+139 bytes, so this is a format change and needs a new version); whether the contract or the service can tell the
+network (today only the client knows `network_id`); and how existing switches and manifests migrate.
+
+## Open items (not design work)
+
+- Testnet cancel check: `recover --name cancel`, expect `PASS: cancelled switch has no release` (runner key deleted at the next heartbeat).
+- Testnet release check: `recover --name release` on Tue 17 Nov 2026, after deadline + 24 h (about 17:18 to 20:30 Berlin), expect the recovered K to equal the wrapped K.
+- Add `wss://testnet.ckb.dev` and `wss://mainnet.ckb.dev` to the CSP header in the Caddyfile on the VPS (documented in `site/DEPLOY.md`).
+- FAQ and privacy text: state that the owner can keep K and so is not bound by the lock (and that cancel does not destroy a copy of K).
+- After both testnet checks pass: record the results in `docs/testing.md` and `DECISIONS.md`, mark phase 4 passed, make the repository public.
+- dead-man-switch: run the AI worker specs `dms-core`, then `dms-ui`, then `dms-e2e`. Prerequisites: both testnet checks passed, the CRT repository public, a deploy key, the organiser address in `config/*.json`.
