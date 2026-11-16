@@ -3,7 +3,7 @@ import {
   SWITCH_PARAM_RANGES, selectRunners, type Runner,
 } from '@crt/client';
 import { el, short } from './dom.ts';
-import { getDeployment } from './deployments.ts';
+import { ORGANISER_ADDRESS, getDeployment } from './deployments.ts';
 import { ckbToShannons, getDraft, resetDraft, saveDraft, shannonsToCkb, type Draft } from './draft.ts';
 import { coalitionSummary } from './coalition.ts';
 import {
@@ -236,7 +236,8 @@ function quoteScreen(host: HTMLElement, d: Draft): void {
   const hbTip = num('heartbeat-tip', shannonsToCkb(d.heartbeatTip));
   const kgTip = num('keygen-tip', shannonsToCkb(d.keygenTip));
   const maxFee = num('max-fee', shannonsToCkb(d.maxFee));
-  const orgFee = num('organiser-fee', shannonsToCkb(d.organiserFee));
+  const orgFee = num('organiser-fee', ORGANISER_ADDRESS ? shannonsToCkb(d.organiserFee) : '0');
+  if (!ORGANISER_ADDRESS) orgFee.disabled = true; // no organiser address in this build, so the fee is always 0
   const errs = el('p', { class: 'err', role: 'alert', id: 'param-errors' });
   const hbOut = el('output', { for: 'heartbeat', id: 'heartbeat-out' });
 
@@ -288,7 +289,7 @@ function quoteScreen(host: HTMLElement, d: Draft): void {
     el('div', { class: 'panel' },
       field('Heartbeat interval', slider, 'Shorter intervals notice a missing runner sooner but cost more.'), hbOut,
       field('Heartbeat tip (CKB per run)', hbTip), field('Keygen tip (CKB per runner)', kgTip), field('Max fee (CKB per run)', maxFee),
-      field('Organiser fee (CKB)', orgFee, 'Optional, paid to whoever runs this app. You can set it to 0.'), noOrg, errs),
+      field('Organiser fee (CKB)', orgFee, ORGANISER_ADDRESS ? 'Optional, paid to whoever runs this app. You can set it to 0.' : 'This build has no organiser address, so there is no organiser fee.'), ...(ORGANISER_ADDRESS ? [noOrg] : []), errs),
     out, nextBox,
   );
   read();

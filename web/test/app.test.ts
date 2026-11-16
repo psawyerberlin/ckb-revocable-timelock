@@ -94,7 +94,9 @@ describe('quote panel', () => {
     quoteDraft();
     const host = mount(); renderCreate(host, 'quote');
     const before = host.querySelector('#spent')?.textContent;
-    expect(num(host, 'spent')).toBeGreaterThan(1530 * 0.98);
+    // this build has no organiser address, so the organiser fee is 0: 1 530 minus the 50 CKB default fee
+    expect(num(host, 'spent')).toBeGreaterThan(1480 * 0.98);
+    expect(num(host, 'spent')).toBeLessThan(1480 * 1.02);
     expect(num(host, 'locked')).toBeGreaterThan(4440 * 0.98);
     expect(num(host, 'locked')).toBeLessThan(4440 * 1.02);
     const slider = host.querySelector('#heartbeat') as HTMLInputElement;
