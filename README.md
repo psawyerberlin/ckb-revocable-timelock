@@ -81,3 +81,5 @@ operator network from CSR instead of building one. The demand question stays ope
 ## Licence
 
 MIT.
+
+Proposals for later versions are in [docs/roadmap.md](docs/roadmap.md).
