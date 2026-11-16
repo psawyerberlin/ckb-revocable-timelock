@@ -101,8 +101,10 @@ for R in "${RS[@]:-}"; do
   case "$R" in 0x[0-9a-fA-F]*) [ ${#R} -eq 66 ] || { echo "bad runner lock hash $R" >&2; exit 1; } ;; *) echo "bad runner lock hash $R" >&2; exit 1 ;; esac
   OUT="$MAN/$R.json"
   if [ -f "$OUT" ]; then echo "manifest for $R exists: $OUT"; continue; fi
-  ARGS=(service publish --code-outpoint "$CODE_OP" --data-outpoint "$DATA_TX:0" --args "$R" --name crt --version 0.2.0
-        --language rust --min-csr 0.6.1 --description "CRT (CKB Revocable Timelock) service of the runner with lock hash $R" --key "$KEY")
+  if [ "$DEPLOYMENT" = testnet-drill ]; then SNAME=crt-drill; SDESC="CRT rehearsal variant (grace 10 min, testnet only) of the runner with lock hash $R"
+  else SNAME=crt; SDESC="CRT (CKB Revocable Timelock) service of the runner with lock hash $R"; fi
+  ARGS=(service publish --code-outpoint "$CODE_OP" --data-outpoint "$DATA_TX:0" --args "$R" --name "$SNAME" --version 0.2.0
+        --language rust --min-csr 0.6.1 --description "$SDESC" --key "$KEY")
   if [ "$DRY" = 1 ]; then
     echo "[dry-run] $CSR ${ARGS[*]} --dry-run"
     [ -f "$SVC" ] && "$CSR" "${ARGS[@]}" --dry-run || true
