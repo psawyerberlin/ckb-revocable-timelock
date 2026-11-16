@@ -11,9 +11,11 @@
 //   status     the switch on chain, its Node Cell states and the time left to the release
 //   renew      move the deadline by +1 hour (needs state armed)
 //   cancel     cancel the switch (the Alive Cell is consumed; the Node Cells stay)
+//   topup      a new heartbeat job where the runner's job no longer runs (also after deadline + GRACE), so the
+//              release happens; switches created before the provisioning margin (client 2026-11-16) can need it
 //   recover    after deadline + GRACE: collect the releases and recover K from the chain; compares it to the wrapped K
 // Options:
-//   --key-file FILE      the owner key (hex; never printed); needed for create, renew, cancel. Pays about 600 CKB, mostly refundable
+//   --key-file FILE      the owner key (hex; never printed); needed for create, renew, cancel, topup. Pays about 600 CKB, mostly refundable
 //   --identity FILE      output of `csr identity --json` of the runner (runner_lock_hash, service_pubkey)
 //   --rpc URL            testnet node with the indexer (default http://127.0.0.1:8112)
 //   --state DIR          state directory (default .devnet/testnet-smoke; files hold K: keep them private)
@@ -37,11 +39,11 @@ for (let i = 1; i < argv.length; i++) {
   else if (a === '--heartbeat') opt.heartbeat = Number(argv[++i]);
   else { console.error(`unknown option ${a}`); process.exit(2); }
 }
-if (!['create', 'status', 'renew', 'cancel', 'recover'].includes(cmd) || !['cancel', 'release'].includes(opt.name)) {
+if (!['create', 'status', 'renew', 'cancel', 'topup', 'recover'].includes(cmd) || !['cancel', 'release'].includes(opt.name)) {
   console.error('usage: testnet-smoke.mjs <create|status|renew|cancel|recover> --name <cancel|release> [--key-file F --identity F --rpc URL]');
   process.exit(2);
 }
-if (!opt.key && ['create', 'renew', 'cancel'].includes(cmd)) { console.error(`--key-file is required for ${cmd}`); process.exit(2); }
+if (!opt.key && ['create', 'renew', 'cancel', 'topup'].includes(cmd)) { console.error(`--key-file is required for ${cmd}`); process.exit(2); }
 const DAY = 86400, GRACE = 86400;
 const hex = (u8) => '0x' + Buffer.from(u8).toString('hex');
 const unhex = (s) => new Uint8Array(Buffer.from(s.replace(/^0x/, ''), 'hex'));
@@ -142,6 +144,10 @@ if (cmd === 'create') {
   await send(await crt.buildCancel(s.T, { reclaimNodeCells: false }, ctx), 'cancel tx');
   save({ ...s, canceledAt: Date.now() });
   log('cancelled. The runner deletes its key at its next heartbeat; check the runner dashboard (jobs, storage) and its deletions.log');
+} else if (cmd === 'topup') {
+  const s = saved();
+  await send(await crt.buildTopUp(s.T, ctx), 'top-up tx');
+  log('top-up sent: the runner releases at its next heartbeat once deadline + GRACE has passed');
 } else if (cmd === 'recover') {
   const s = saved();
   const rel = await crt.collectReleases(s.T, opt.rpc, { nodeLockCodeHash: deployment.node_lock.code_hash });

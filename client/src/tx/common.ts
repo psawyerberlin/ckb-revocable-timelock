@@ -48,6 +48,18 @@ export function heartbeatRuns(termSeconds: bigint | number, heartbeatBlocks: num
   return Math.max(1, runs);
 }
 
+/** Blocks can come faster than the assumed `blockSeconds` (testnet ran at ≈ 9.2 s against 10.8 s in Nov 2026): a job
+ *  sized by the estimate then runs out before deadline + grace and the release run never happens. Jobs are therefore
+ *  provisioned for blocks up to 40 % faster, plus two spare runs. Unused runs cost nothing: the job ends at the
+ *  release (or cancel) and its remaining capacity returns to the refund lock. */
+export const HEARTBEAT_FAST_FACTOR = 0.6;
+export const HEARTBEAT_SPARE_RUNS = 2;
+
+/** Runs a heartbeat job is funded with for `termSeconds` (see HEARTBEAT_FAST_FACTOR). */
+export function provisionedHeartbeatRuns(termSeconds: bigint | number, heartbeatBlocks: number, blockSeconds: number): number {
+  return heartbeatRuns(termSeconds, heartbeatBlocks, blockSeconds * HEARTBEAT_FAST_FACTOR) + HEARTBEAT_SPARE_RUNS;
+}
+
 export interface ChainNow { now: bigint; tip: bigint }
 
 export async function chainNow(ctx: TxContext): Promise<ChainNow> {
@@ -108,14 +120,17 @@ export function keygenJob(T: string, p: Pick<SwitchParams, 'keygenTip' | 'maxFee
   };
 }
 
-/** Heartbeat job covering now → deadline + grace (the deployment's, default 24 h); expiry = end of term + ≈ 7 days. */
+/** Heartbeat job covering now → deadline + grace (the deployment's, default 24 h) with the provisioning margin;
+ *  expiry = end of the funded runs + ≈ 7 days. `overdue`: deadline + grace may already be past (a top-up for a release
+ *  nobody checked): the job is funded with the spare runs plus one. */
 export function heartbeatJob(
   T: string, p: Pick<SwitchParams, 'heartbeatBlocks' | 'heartbeatTip' | 'maxFee'>,
   at: ChainNow, deadline: bigint, blockSeconds: number, refundLockHash: string, graceSeconds: number = GRACE_SECONDS,
+  overdue = false,
 ): CrtJob {
   const term = deadline + BigInt(graceSeconds) - at.now;
-  if (term <= 0n) throw new TxBuildError('deadline + GRACE is already in the past');
-  const runs = heartbeatRuns(term, p.heartbeatBlocks, blockSeconds);
+  if (term <= 0n && !overdue) throw new TxBuildError('deadline + GRACE is already in the past');
+  const runs = term <= 0n ? HEARTBEAT_SPARE_RUNS + 1 : provisionedHeartbeatRuns(term, p.heartbeatBlocks, blockSeconds);
   const termBlocks = BigInt(runs) * BigInt(p.heartbeatBlocks);
   return {
     trigger: { kind: 'Every', blocks: BigInt(p.heartbeatBlocks) }, tipShannons: p.heartbeatTip, maxFeeShannons: p.maxFee,

@@ -7,7 +7,7 @@ import type { ccc } from '@ckb-ccc/core';
 import type { SwitchParams } from '../core/cost.ts';
 import type { TxContext } from './common.ts';
 import type { CreateRunner } from './create.ts';
-import { type CancelOptions, type HeartbeatParams, buildArm, buildCancel, buildReclaim, buildRenew, buildRewrap } from './owner.ts';
+import { type CancelOptions, type HeartbeatParams, buildArm, buildCancel, buildReclaim, buildRenew, buildRewrap, buildTopUp } from './owner.ts';
 
 /** The owner builders bound to one `{signer, deployment}` context, with the call shapes of spec 03 phase 3. */
 export function txBuilders(ctx: TxContext) {
@@ -18,5 +18,6 @@ export function txBuilders(ctx: TxContext) {
     buildRewrap: (T: string, dropR: string[], addRunners: CreateRunner[]) => buildRewrap(T, dropR, addRunners, ctx),
     buildCancel: (T: string, opts: CancelOptions = { reclaimNodeCells: true }) => buildCancel(T, opts, ctx),
     buildReclaim: (T: string, runners?: string[]): Promise<ccc.Transaction> => buildReclaim(T, runners ? { ...ctx, runners } : ctx),
+    buildTopUp: (T: string, params?: Partial<HeartbeatParams>): Promise<ccc.Transaction> => buildTopUp(T, params ? { ...ctx, params } : ctx),
   };
 }

@@ -183,6 +183,35 @@ export interface ReclaimOptions {
 }
 
 /**
+ * Top-up: a new heartbeat job for every runner of `T` whose job no longer runs (none live, used up, or expired), for
+ * the switch's current deadline. Also when deadline + grace is already past and nothing was released: the job is then
+ * funded with a few runs, so the next run releases. Node Cells are not touched. Throws when every runner still has a
+ * running heartbeat job.
+ */
+export async function buildTopUp(T: string, ctx: TxContext & { params?: Partial<HeartbeatParams> }): Promise<ccc.Transaction> {
+  const { T: t, nodes, ownerLockHash } = await switchNodes(T, ctx);
+  const armed = nodes.filter((n) => n.data.state === 1);
+  if (armed.length === 0) throw new TxBuildError('no Node Cell in state 1: nothing to guard');
+  const deadline = commonDeadline(nodes);
+  const d = ctx.deployment;
+  const at = await chainNow(ctx);
+  const jobs = await liveJobCells(t, armed.map((n) => n.R), ctx);
+  const running = (R: string): boolean => jobs.some((j) => j.R === R && j.job.trigger.kind === 'Every'
+    && j.job.remainingRuns > 0 && j.job.expiryBlock > at.tip);
+  const missing = armed.filter((n) => !running(n.R));
+  if (missing.length === 0) throw new TxBuildError('every guardian still has a running heartbeat job');
+  const p: SwitchParams = { ...defaultSwitchParams(), ...currentHeartbeatParams(jobs), ...ctx.params, organiserFee: 0n };
+  validateSwitchParams(p, { networkId: d.network_id });
+  const tx = ccc.Transaction.from({});
+  for (const n of missing) {
+    const o = jobOutput(d, n.R, heartbeatJob(t, p, at, deadline, blockSecondsOf(ctx), ownerLockHash, graceSeconds(d), true));
+    tx.addOutput(o.cellOutput, o.outputData);
+  }
+  tx.addCellDeps(csrJobDeps(d));
+  return finish(tx, ctx);
+}
+
+/**
  * Reclaim: all Node Cells of `T` (any state) and one expired job cell (`since` = absolute block `expiry_block`,
  * refund path of the CSR job lock: no registry dep). The job lock accepts a single job input per transaction, so
  * call again for the next expired job. Throws when there is nothing to reclaim.

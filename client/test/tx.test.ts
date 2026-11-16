@@ -9,7 +9,7 @@ import { identity } from '../src/core/hash.ts';
 import { jobPayload } from '../src/core/payload.ts';
 import { crtServiceId, parseDeployment } from '../src/chain/deployment.ts';
 import {
-  TxBuildError, buildArm, buildCancel, buildCreate, buildReclaim, buildRenew, buildRewrap, heartbeatRuns, jobOutput, txBuilders,
+  TxBuildError, buildArm, buildCancel, buildCreate, buildReclaim, buildRenew, buildRewrap, buildTopUp, heartbeatRuns, jobOutput, txBuilders,
   type TxContext,
 } from '../src/tx/index.ts';
 import { decodeJob, jobCell, minJobCapacity } from '../vendor/csr-job.mjs';
@@ -250,10 +250,10 @@ test('build_arm_sets_descriptor_and_heartbeat_jobs', async () => {
     assert.equal(d.deadline, deadline);
     assert.equal(o.capacity, 244n * CKB);
   }
-  // heartbeat jobs: remainingRuns = ceil(term / HEARTBEAT), term = deadline + GRACE − now.
+  // heartbeat jobs: funded for blocks up to 40 % faster than assumed, plus 2 spare runs; term = deadline + GRACE − now.
   const term = Number(deadline + BigInt(GRACE_SECONDS) - NOW);
-  const runs = Math.ceil(term / (DEFAULT_BLOCK_SECONDS * 8_000));
-  assert.equal(runs, heartbeatRuns(term, 8_000, DEFAULT_BLOCK_SECONDS));
+  const runs = Math.ceil(term / (DEFAULT_BLOCK_SECONDS * 0.6 * 8_000)) + 2;
+  assert.equal(Math.ceil(term / (DEFAULT_BLOCK_SECONDS * 8_000)), heartbeatRuns(term, 8_000, DEFAULT_BLOCK_SECONDS)); // the estimate
   const jobs = tx.outputs.map((o, i) => ({ o, i })).filter(({ o }) => o.type?.codeHash === deployment.csr.job_type.code_hash);
   assert.equal(jobs.length, 5);
   assert.deepEqual(jobs.map(({ o }) => o.type!.args).sort(), Rs.map((R) => crtServiceId(deployment, R)).sort());
@@ -305,7 +305,7 @@ test('build_renew_defaults_to_current_params', async () => {
   for (const i of nodeIdx) assert.equal(decodeNodeCellData(tx.outputsData[i]!).deadline, newDeadline);
   const jobIdx = tx.outputs.map((o, i) => (o.type?.codeHash === deployment.csr.job_type.code_hash ? i : -1)).filter((i) => i >= 0);
   assert.equal(jobIdx.length, 5);
-  const runs = Math.ceil(Number(newDeadline + BigInt(GRACE_SECONDS) - NOW) / (DEFAULT_BLOCK_SECONDS * 4_000));
+  const runs = Math.ceil(Number(newDeadline + BigInt(GRACE_SECONDS) - NOW) / (DEFAULT_BLOCK_SECONDS * 0.6 * 4_000)) + 2;
   for (const i of jobIdx) {
     const job = decodeJob(tx.outputsData[i]!);
     assert.deepEqual(job.trigger, { kind: 'Every', blocks: 4_000n });
@@ -432,8 +432,14 @@ test('heartbeat jobs cover deadline + the deployment grace', async () => {
   const deadline = at.now + 1_800n;   // a 30-minute rehearsal
   const day = heartbeatJob('0x' + '11'.repeat(32), p, at, deadline, 10, '0x' + '22'.repeat(32));
   const drill = heartbeatJob('0x' + '11'.repeat(32), p, at, deadline, 10, '0x' + '22'.repeat(32), 600);
-  assert.equal(day.remainingRuns, Math.ceil((1_800 + 86_400) / (10 * 100)));
-  assert.equal(drill.remainingRuns, Math.ceil((1_800 + 600) / (10 * 100)));
+  assert.equal(day.remainingRuns, Math.ceil((1_800 + 86_400) / (10 * 0.6 * 100)) + 2);
+  assert.equal(drill.remainingRuns, Math.ceil((1_800 + 600) / (10 * 0.6 * 100)) + 2);
+  // the drill of 2026-11-16: blocks at 9.2 s instead of 10 s; the funded runs must reach deadline + grace
+  assert.ok(drill.remainingRuns * 100 * 9.2 >= 1_800 + 600, 'covers the release time with faster blocks');
+  // overdue: deadline + grace past, nothing released → a few runs (top-up), otherwise refused
+  const late = { tip: 1_000n, now: deadline + 3_600n };
+  assert.throws(() => heartbeatJob('0x' + '11'.repeat(32), p, late, deadline, 10, '0x' + '22'.repeat(32), 600));
+  assert.equal(heartbeatJob('0x' + '11'.repeat(32), p, late, deadline, 10, '0x' + '22'.repeat(32), 600, true).remainingRuns, 3);
 });
 
 test('build_arm_accepts_a_rehearsal_deadline_below_30_minutes', async () => {
@@ -443,3 +449,20 @@ test('build_arm_accepts_a_rehearsal_deadline_below_30_minutes', async () => {
   const tx = await buildArm(T, h(0x99), { ...ctx, params: { heartbeatBlocks: 50 } });
   assert.ok(tx.outputs.length > 0);
 });
+
+test('build_top_up_adds_jobs_only_where_none_runs', async () => {
+  const { chain, ctx } = await setup();
+  const { T, Rs, deadline } = putSwitch(chain, (await ctx.signer.getRecommendedAddressObj()).script, { deadline: NOW - 3_600n });
+  // no job cells at all: every armed runner gets one, although deadline + grace may be past
+  const tx = await buildTopUp(T, { ...ctx, deployment: { ...deployment, grace_seconds: 600 }, params: { heartbeatBlocks: 50 } });
+  const jobs = tx.outputs.map((o, i) => ({ o, i })).filter(({ o }) => o.type?.codeHash === deployment.csr.job_type.code_hash);
+  assert.equal(jobs.length, Rs.length);
+  for (const { i } of jobs) {
+    const job = decodeJob(tx.outputsData[i]!);
+    assert.deepEqual(job.trigger, { kind: 'Every', blocks: 50n });
+    assert.equal(job.remainingRuns, 3); // overdue: spare runs + 1
+  }
+  assert.equal(tx.outputs.filter((o) => o.lock.codeHash === deployment.node_lock.code_hash).length, 0, 'Node Cells untouched');
+  void deadline;
+});
+
