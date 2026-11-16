@@ -110,7 +110,13 @@ function wire(): void {
   el('crt-btn-offline')?.addEventListener('click', () => run('Recovering from pasted values', async () => {
     const t = el('crt-paste') as HTMLTextAreaElement | null;
     const lines = (t?.value ?? '').split('\n');
-    const { unmatched } = parseReleases(descriptor, lines);
+    const { releases, unmatched } = parseReleases(descriptor, lines);
+    const short = (v: string): string => (v.length > 20 ? `${v.slice(0, 10)}…${v.slice(-6)}` : v);
+    if (unmatched.length && releases.size === 0) {
+      throw new Error(`${unmatched.map(short).join(', ')}: not the release value of any guardian of this switch. `
+        + 'Paste the private key a guardian published in its released Node Cell (the last 32 bytes of the cell data), '
+        + 'not the recovered key.');
+    }
     const K = await kit.api!.recover(lines);
     return `Key recovered (${bytesToHex(K)}).${unmatched.length ? `\nIgnored ${unmatched.length} value(s) that match no node.` : ''}`;
   }));
